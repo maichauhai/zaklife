@@ -138,10 +138,15 @@
   <div class="card">
     <div class="card-title">🎯 Quản lý Habits</div>
     <div id="habitManager"></div>
-    <div style="display:flex;gap:8px;margin-top:10px">
-      <input class="gratitude-input" id="newHabitIcon" placeholder="🐟" style="width:50px;text-align:center">
-      <input class="gratitude-input" id="newHabitName" placeholder="Tên habit mới" style="flex:1">
-      <button class="btn btn-outline btn-sm" onclick="addHabit()">+</button>
+    <div style="margin-top:12px">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Chọn icon:</div>
+      <div id="iconPicker" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
+      <input type="hidden" id="newHabitIcon" value="📌">
+      <div style="display:flex;gap:8px">
+        <div id="selectedIcon" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:var(--card);font-size:24px;border:2px solid var(--accent);cursor:pointer" onclick="document.getElementById('iconPicker').style.display=document.getElementById('iconPicker').style.display==='none'?'flex':'none'">📌</div>
+        <input class="gratitude-input" id="newHabitName" placeholder="Tên habit mới" style="flex:1">
+        <button class="btn btn-outline btn-sm" onclick="addHabit()">+</button>
+      </div>
     </div>
   </div>
   <div class="card">
@@ -438,10 +443,25 @@ function exportText(){
 // ═══════════════════════════════════════
 // SETTINGS
 // ═══════════════════════════════════════
+const HABIT_ICONS=['🐟','🌱','💧','👕','🛏️','📚','🏃','🧘','🍎','💊','🎯','🎮','🎵','✍️','🧹','🛒','🐶','🐱','☕','🍵','🥤','🧃','🥗','🍳','🏋️','🚴','🧠','💤','📸','💰','🙏','🌸','🌈','⭐','🔥','💎','🎨','🎸','📖','🕐','🌙','☀️','🍀','🦋','🐢','🐠','🌺','🍃'];
+let _pendingDelete=null;
+
 function renderSettings(){
   document.getElementById('habitManager').innerHTML=state.habits.map(h=>
-    `<div class="habit-item"><div class="habit-icon">${h.icon}</div><div class="habit-info"><div class="habit-name">${h.name}</div></div><button class="btn btn-sm btn-danger" onclick="removeHabit(${h.id})">✕</button></div>`
+    `<div class="habit-item" id="habit-${h.id}"><div class="habit-icon">${h.icon}</div><div class="habit-info"><div class="habit-name">${h.name}</div></div><button class="btn btn-sm btn-danger" onclick="removeHabit(${h.id})" style="min-width:36px;min-height:36px;font-size:16px;padding:0;display:flex;align-items:center;justify-content:center">✕</button></div>`
   ).join('');
+  // Render icon picker
+  const picker=document.getElementById('iconPicker');
+  if(picker){
+    picker.innerHTML=HABIT_ICONS.map(ic=>
+      `<div onclick="pickIcon('${ic}')" style="width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:var(--card);cursor:pointer;font-size:20px;border:2px solid transparent;transition:.15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='transparent'">${ic}</div>`
+    ).join('');
+  }
+}
+
+function pickIcon(ic){
+  document.getElementById('newHabitIcon').value=ic;
+  document.getElementById('selectedIcon').textContent=ic;
 }
 
 function addHabit(){
@@ -450,14 +470,25 @@ function addHabit(){
   if(!name){showToast('⚠️ Nhập tên habit!');return}
   state.habits.push({id:state.nextHabitId++,icon,name});
   saveState();renderSettings();
-  document.getElementById('newHabitIcon').value='';document.getElementById('newHabitName').value='';
+  document.getElementById('newHabitName').value='';
+  document.getElementById('newHabitIcon').value='📌';
+  document.getElementById('selectedIcon').textContent='📌';
   showToast('✅ Đã thêm habit!');
 }
 
 function removeHabit(id){
-  if(!confirm('Xóa habit này?'))return;
-  state.habits=state.habits.filter(h=>h.id!==id);
-  saveState();renderSettings();
+  if(_pendingDelete===id){
+    state.habits=state.habits.filter(h=>h.id!==id);
+    _pendingDelete=null;
+    saveState();renderSettings();
+    showToast('🗑️ Đã xóa!');
+  } else {
+    _pendingDelete=id;
+    const el=document.getElementById('habit-'+id);
+    if(el)el.style.background='rgba(248,113,113,0.15)';
+    showToast('⚠️ Bấm ✕ lần nữa để xóa');
+    setTimeout(()=>{_pendingDelete=null;if(el)el.style.background='';},3000);
+  }
 }
 
 function clearData(){
