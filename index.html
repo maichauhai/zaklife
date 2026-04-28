@@ -6,6 +6,8 @@
 <title>ZakLife — Personal Dashboard</title>
 <meta name="description" content="Personal life management: journal, habits, mood tracking">
 <link rel="stylesheet" href="style.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 </head>
 <body>
 
@@ -27,6 +29,10 @@
 
 <!-- ═══ DASHBOARD ═══ -->
 <div class="section active" id="sec-dashboard">
+  <div class="card" id="nanaCard" style="display:none;border-color:rgba(192,132,252,0.3);background:rgba(192,132,252,0.05)">
+    <div class="card-title">🤖 Nana nhắn gửi</div>
+    <div id="nanaMessages" style="font-size:13px;color:var(--text2)"></div>
+  </div>
   <div class="stat-row">
     <div class="stat-box"><div class="stat-value" id="statStreak">0</div><div class="stat-label">Day Streak</div></div>
     <div class="stat-box"><div class="stat-value" id="statMood">—</div><div class="stat-label">Avg Mood</div></div>
@@ -469,10 +475,83 @@ function showToast(msg){
 }
 
 // ═══════════════════════════════════════
+// FIREBASE
+// ═══════════════════════════════════════
+const FB_CONFIG={
+  apiKey:"AIzaSyBpGeAlMcZtGTkt8JfuPSofArtTkx_XlJE",
+  authDomain:"monstea-pos.firebaseapp.com",
+  databaseURL:"https://monstea-pos-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"monstea-pos",
+  storageBucket:"monstea-pos.firebasestorage.app",
+  messagingSenderId:"742890598182",
+  appId:"1:742890598182:web:ce67a7db065fe94b845be7"
+};
+let fbDb=null;
+
+function initFirebase(){
+  try{
+    firebase.initializeApp(FB_CONFIG);
+    fbDb=firebase.database();
+    logger('Firebase connected');
+    // Listen for Nana messages
+    fbDb.ref('zaklife/nana_messages').on('value',snap=>{
+      const msgs=snap.val();
+      renderNanaMessages(msgs);
+    });
+    // Initial sync: pull from Firebase
+    fbDb.ref('zaklife/data').once('value',snap=>{
+      const remote=snap.val();
+      if(remote){
+        // Merge: remote wins for fields that exist
+        if(remote.entries)state.entries={...state.entries,...remote.entries};
+        if(remote.habitLog)state.habitLog={...state.habitLog,...remote.habitLog};
+        if(remote.calNotes)state.calNotes={...state.calNotes,...remote.calNotes};
+        if(remote.habits)state.habits=remote.habits;
+        localStorage.setItem('zaklife',JSON.stringify(state));
+        renderDashboard();
+        logger('Synced from Firebase');
+      }
+    });
+  }catch(e){logger('Firebase error: '+e)}
+}
+
+function syncToFirebase(){
+  if(!fbDb)return;
+  fbDb.ref('zaklife/data').set({
+    entries:state.entries,
+    habitLog:state.habitLog,
+    calNotes:state.calNotes||{},
+    habits:state.habits,
+    lastSync:new Date().toISOString()
+  });
+}
+
+// Override saveState to also sync Firebase
+const _origSave=saveState;
+saveState=function(){_origSave();syncToFirebase()}
+
+function renderNanaMessages(msgs){
+  const card=document.getElementById('nanaCard');
+  const container=document.getElementById('nanaMessages');
+  if(!msgs){card.style.display='none';return}
+  const arr=Object.entries(msgs).sort((a,b)=>b[1].timestamp.localeCompare(a[1].timestamp));
+  if(!arr.length){card.style.display='none';return}
+  card.style.display='block';
+  container.innerHTML=arr.slice(0,5).map(([k,m])=>{
+    const time=new Date(m.timestamp).toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    const icon=m.type==='reminder'?'⏰':m.type==='praise'?'🎉':m.type==='analysis'?'📊':'💬';
+    return `<div style="padding:8px 0;border-bottom:1px solid var(--border)"><div style="display:flex;justify-content:space-between"><span>${icon} <strong>Nana</strong></span><span style="font-size:11px;color:var(--text2)">${time}</span></div><div style="margin-top:4px">${m.text}</div></div>`;
+  }).join('');
+}
+
+function logger(msg){console.log('[ZakLife]',msg)}
+
+// ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
 loadState();
 document.getElementById('headerDate').textContent=new Date().toLocaleDateString('vi-VN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+initFirebase();
 renderDashboard();
 </script>
 </body>
