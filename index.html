@@ -18,7 +18,7 @@
 <nav class="bottom-nav">
   <button class="nav-item active" onclick="switchTab('dashboard')"><span>📊</span><span>Dashboard</span></button>
   <button class="nav-item" onclick="switchTab('journal')"><span>📝</span><span>Journal</span></button>
-  <button class="nav-item" onclick="switchTab('habits')"><span>✅</span><span>Habits</span></button>
+  <button class="nav-item" onclick="switchTab('habits')"><span>📅</span><span>Calendar</span></button>
   <button class="nav-item" onclick="switchTab('history')"><span>📚</span><span>History</span></button>
   <button class="nav-item" onclick="switchTab('settings')"><span>⚙️</span><span>Settings</span></button>
 </nav>
@@ -87,15 +87,34 @@
   <button class="btn btn-primary" onclick="saveJournal()" style="margin-top:8px">💾 Lưu nhật ký hôm nay</button>
 </div>
 
-<!-- ═══ HABITS ═══ -->
+<!-- ═══ CALENDAR ═══ -->
 <div class="section" id="sec-habits">
   <div class="card">
-    <div class="card-title">📋 Checklist hôm nay</div>
-    <div id="habitList"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <button class="btn btn-outline btn-sm" onclick="calNav(-1)">◀</button>
+      <div class="card-title" id="calTitle" style="margin:0"></div>
+      <button class="btn btn-outline btn-sm" onclick="calNav(1)">▶</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;margin-bottom:4px">
+      <span style="font-size:11px;color:var(--text2);padding:4px">CN</span>
+      <span style="font-size:11px;color:var(--text2);padding:4px">T2</span>
+      <span style="font-size:11px;color:var(--text2);padding:4px">T3</span>
+      <span style="font-size:11px;color:var(--text2);padding:4px">T4</span>
+      <span style="font-size:11px;color:var(--text2);padding:4px">T5</span>
+      <span style="font-size:11px;color:var(--text2);padding:4px">T6</span>
+      <span style="font-size:11px;color:var(--text2);padding:4px">T7</span>
+    </div>
+    <div id="calGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px"></div>
   </div>
-  <div class="card">
-    <div class="card-title">🔥 Streaks</div>
-    <div id="streakList"></div>
+  <div class="card" id="calLegend">
+    <div class="card-title">📌 Chú thích</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--text2)">
+      <span>🐟 Cá</span><span>🌱 Cây</span><span>👕 QA 7d</span><span>🛏️ Chăn 14d</span><span>📝 Ghi chú</span>
+    </div>
+  </div>
+  <div class="card" id="calDetail" style="display:none">
+    <div class="card-title" id="calDetailTitle">📅 Chi tiết</div>
+    <div id="calDetailBody"></div>
   </div>
 </div>
 
@@ -149,16 +168,19 @@ const TAGS=['Công việc','Gia đình','Bạn bè','Sức khỏe','Tiền bạc
 const DEFAULT_HABITS=[
   {id:1,icon:'🐟',name:'Cho cá ăn'},
   {id:2,icon:'🌱',name:'Tưới cây'},
-  {id:3,icon:'👕',name:'Giặt đồ'},
-  {id:4,icon:'💧',name:'Uống 2L nước'}
+  {id:3,icon:'👕',name:'Giặt quần áo',cycle:7},
+  {id:4,icon:'🛏️',name:'Giặt chăn ga',cycle:14},
+  {id:5,icon:'💧',name:'Uống 2L nước'}
 ];
 
 let state={
-  entries:{},       // {date: {mood,moodEmoji,text,tags,sleep,gratitude,timestamp}}
+  entries:{},
   habits:[...DEFAULT_HABITS],
   habitLog:{},      // {date: {habitId: true/false}}
+  calNotes:{},      // {date: "note text"}
   nextHabitId:10
 };
+let calMonth=new Date().getMonth(), calYear=new Date().getFullYear(), calSelected=null;
 
 function today(){return new Date().toISOString().slice(0,10)}
 function saveState(){localStorage.setItem('zaklife',JSON.stringify(state))}
@@ -225,31 +247,83 @@ function saveJournal(){
 }
 
 // ═══════════════════════════════════════
-// HABITS
+// CALENDAR + HABITS
 // ═══════════════════════════════════════
-function renderHabits(){
-  const d=today();
-  if(!state.habitLog[d])state.habitLog[d]={};
-  const log=state.habitLog[d];
+function renderHabits(){renderCalendar()}
 
-  document.getElementById('habitList').innerHTML=state.habits.map(h=>{
+function calNav(dir){calMonth+=dir;if(calMonth>11){calMonth=0;calYear++}if(calMonth<0){calMonth=11;calYear--}renderCalendar()}
+
+function fmtDate(y,m,d){return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
+
+function isDueLaundry(dateStr,habit){
+  if(!habit.cycle)return false;
+  const logs=Object.keys(state.habitLog).filter(d=>state.habitLog[d][habit.id]).sort().reverse();
+  if(!logs.length)return true;
+  const last=new Date(logs[0]),cur=new Date(dateStr);
+  return(cur-last)/(86400000)>=habit.cycle;
+}
+
+function renderCalendar(){
+  const months=['Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'];
+  document.getElementById('calTitle').textContent=`📅 ${months[calMonth]} ${calYear}`;
+  const first=new Date(calYear,calMonth,1).getDay();
+  const days=new Date(calYear,calMonth+1,0).getDate();
+  const todayStr=today();
+  let html='';
+  for(let i=0;i<first;i++)html+='<div></div>';
+  for(let d=1;d<=days;d++){
+    const ds=fmtDate(calYear,calMonth,d);
+    const log=state.habitLog[ds]||{};
+    const note=state.calNotes[ds];
+    const isToday=ds===todayStr;
+    const isSel=ds===calSelected;
+    let icons='';
+    state.habits.forEach(h=>{if(log[h.id])icons+=h.icon});
+    if(note)icons+='📝';
+    // Laundry due indicators
+    state.habits.filter(h=>h.cycle).forEach(h=>{if(isDueLaundry(ds,h)&&!log[h.id]&&ds>=todayStr)icons+='⚠️'});
+    const bg=isSel?'background:rgba(129,140,248,0.2);border-color:var(--accent)':isToday?'background:rgba(129,140,248,0.1)':'';
+    html+=`<div onclick="selectCalDay('${ds}')" style="padding:4px 2px;border-radius:8px;text-align:center;cursor:pointer;border:1px solid ${isSel?'var(--accent)':'transparent'};min-height:48px;${bg}"><div style="font-size:13px;font-weight:${isToday?'700':'400'};color:${isToday?'var(--accent)':'var(--text)'}">${d}</div><div style="font-size:10px;line-height:1.2">${icons}</div></div>`;
+  }
+  document.getElementById('calGrid').innerHTML=html;
+  if(calSelected)renderCalDetail(calSelected);
+}
+
+function selectCalDay(ds){
+  calSelected=ds;renderCalendar();
+  document.getElementById('calDetail').style.display='block';
+  renderCalDetail(ds);
+}
+
+function renderCalDetail(ds){
+  const d=new Date(ds);
+  const weekday=['CN','T2','T3','T4','T5','T6','T7'][d.getDay()];
+  document.getElementById('calDetailTitle').textContent=`📅 ${weekday} ${ds}`;
+  if(!state.habitLog[ds])state.habitLog[ds]={};
+  const log=state.habitLog[ds];
+  let html=state.habits.map(h=>{
     const done=log[h.id];
-    return `<div class="habit-item"><div class="habit-icon">${h.icon}</div><div class="habit-info"><div class="habit-name">${h.name}</div><div class="habit-streak">Streak: ${getStreak(h.id)} ngày</div></div><button class="habit-check ${done?'done':''}" onclick="toggleHabit(${h.id})">${done?'✓':''}</button></div>`;
+    let extra='';
+    if(h.cycle){const due=isDueLaundry(ds,h);extra=due&&!done?'<span style="color:var(--yellow);font-size:11px"> ⚠️ Đến hạn!</span>':''}
+    return `<div class="habit-item"><div class="habit-icon">${h.icon}</div><div class="habit-info"><div class="habit-name">${h.name}${extra}</div></div><button class="habit-check ${done?'done':''}" onclick="toggleHabitCal('${ds}',${h.id})">${done?'✓':''}</button></div>`;
   }).join('');
-
-  document.getElementById('streakList').innerHTML=state.habits.map(h=>{
-    const s=getStreak(h.id);
-    const bar=Math.min(s*10,100);
-    return `<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>${h.icon} ${h.name}</span><span style="color:var(--accent)">${s} ngày 🔥</span></div><div style="height:6px;background:var(--border);border-radius:3px"><div style="height:100%;width:${bar}%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;transition:.3s"></div></div></div>`;
-  }).join('');
+  const note=state.calNotes[ds]||'';
+  html+=`<div style="margin-top:10px"><div style="font-size:12px;color:var(--text2);margin-bottom:4px">📝 Ghi chú:</div><textarea class="journal-entry" style="min-height:60px" placeholder="Ghi chú cho ngày này..." onchange="saveCalNote('${ds}',this.value)">${note}</textarea></div>`;
+  document.getElementById('calDetailBody').innerHTML=html;
 }
 
-function toggleHabit(id){
-  const d=today();
-  if(!state.habitLog[d])state.habitLog[d]={};
-  state.habitLog[d][id]=!state.habitLog[d][id];
-  saveState();renderHabits();renderDashboard();
+function toggleHabitCal(ds,id){
+  if(!state.habitLog[ds])state.habitLog[ds]={};
+  state.habitLog[ds][id]=!state.habitLog[ds][id];
+  saveState();renderCalendar();renderDashboard();
 }
+
+function saveCalNote(ds,text){
+  if(text.trim())state.calNotes[ds]=text.trim();else delete state.calNotes[ds];
+  saveState();renderCalendar();
+}
+
+function toggleHabit(id){toggleHabitCal(today(),id)}
 
 function getStreak(id){
   let streak=0;const d=new Date();
