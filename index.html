@@ -51,6 +51,14 @@
     <div class="card-title">🎯 Habits hôm nay</div>
     <div id="dashHabits"></div>
   </div>
+  <div class="card" id="weeklyReviewCard" style="border-color:rgba(129,140,248,0.3);background:rgba(129,140,248,0.05)">
+    <div class="card-title">📊 Weekly Review</div>
+    <div id="weeklyReview" style="font-size:13px;color:var(--text2)"></div>
+  </div>
+  <div class="card" id="nanaInsightCard" style="border-color:rgba(192,132,252,0.3);background:rgba(192,132,252,0.05)">
+    <div class="card-title"><img src="nana-avatar.png" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle"> Nana Insights</div>
+    <div id="nanaInsights" style="font-size:13px;color:var(--text2)"></div>
+  </div>
 </div>
 
 <!-- ═══ JOURNAL ═══ -->
@@ -294,7 +302,8 @@ function renderCalendar(){
     // Laundry due indicators
     state.habits.filter(h=>h.cycle).forEach(h=>{if(isDueLaundry(ds,h)&&!log[h.id]&&ds>=todayStr)icons+='⚠️'});
     const bg=isSel?'background:rgba(129,140,248,0.2);border-color:var(--accent)':isToday?'background:rgba(129,140,248,0.1)':'';
-    html+=`<div onclick="selectCalDay('${ds}')" style="padding:4px 2px;border-radius:8px;text-align:center;cursor:pointer;border:1px solid ${isSel?'var(--accent)':'transparent'};min-height:48px;${bg}"><div style="font-size:13px;font-weight:${isToday?'700':'400'};color:${isToday?'var(--accent)':'var(--text)'}">${d}</div><div style="font-size:10px;line-height:1.2">${icons}</div></div>`;
+    const notePreview=note?`<div style="font-size:8px;color:var(--accent2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;padding:0 2px">${note.slice(0,12)}</div>`:'';
+    html+=`<div onclick="selectCalDay('${ds}')" style="padding:4px 2px;border-radius:8px;text-align:center;cursor:pointer;border:1px solid ${isSel?'var(--accent)':'transparent'};min-height:48px;${bg}"><div style="font-size:13px;font-weight:${isToday?'700':'400'};color:${isToday?'var(--accent)':'var(--text)'}">${d}</div><div style="font-size:10px;line-height:1.2">${icons}</div>${notePreview}</div>`;
   }
   document.getElementById('calGrid').innerHTML=html;
   if(calSelected)renderCalDetail(calSelected);
@@ -394,6 +403,120 @@ function renderDashboard(){
   const done=state.habits.filter(h=>log[h.id]).length;
   document.getElementById('dashHabits').innerHTML=`<div style="font-size:13px;color:var(--text2);margin-bottom:8px">${done}/${state.habits.length} hoàn thành</div>`+
     state.habits.map(h=>`<span style="font-size:20px;margin-right:4px;opacity:${log[h.id]?1:0.3}">${h.icon}</span>`).join('');
+
+  // Weekly Review + Nana Insights
+  renderWeeklyReview();
+  renderNanaInsights();
+}
+
+function renderWeeklyReview(){
+  const days=[];for(let i=0;i<7;i++)days.push(new Date(Date.now()-i*86400000).toISOString().slice(0,10));
+  
+  // Journal consistency
+  const journalDays=days.filter(d=>state.entries[d]).length;
+  const journalBar=`<div style="background:var(--border);border-radius:6px;height:8px;margin:6px 0"><div style="background:linear-gradient(90deg,var(--accent),var(--accent2));height:100%;border-radius:6px;width:${Math.round(journalDays/7*100)}%;transition:.3s"></div></div>`;
+  
+  // Habit completion
+  let totalDone=0,totalPossible=0;
+  days.forEach(d=>{
+    const log=state.habitLog[d]||{};
+    state.habits.forEach(h=>{totalPossible++;if(log[h.id])totalDone++;});
+  });
+  const habitPct=totalPossible?Math.round(totalDone/totalPossible*100):0;
+  const habitBar=`<div style="background:var(--border);border-radius:6px;height:8px;margin:6px 0"><div style="background:linear-gradient(90deg,var(--green),#22d3ee);height:100%;border-radius:6px;width:${habitPct}%;transition:.3s"></div></div>`;
+  
+  // Mood trend
+  const moodDays=days.filter(d=>state.entries[d]&&state.entries[d].mood);
+  let moodTrend='';
+  if(moodDays.length>=3){
+    const recent=moodDays.slice(0,3).reduce((s,d)=>s+state.entries[d].mood,0)/3;
+    const older=moodDays.slice(-3).reduce((s,d)=>s+state.entries[d].mood,0)/Math.min(3,moodDays.length);
+    const diff=recent-older;
+    moodTrend=diff>0.5?`📈 Mood đang tăng (+${diff.toFixed(1)})`:diff<-0.5?`📉 Mood giảm (${diff.toFixed(1)})`:'➡️ Mood ổn định';
+  }
+
+  // Habit streaks
+  const streaks=state.habits.map(h=>({icon:h.icon,name:h.name,streak:getStreak(h.id)})).filter(h=>h.streak>0).sort((a,b)=>b.streak-a.streak);
+  const streakHtml=streaks.length?streaks.slice(0,3).map(h=>`<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(74,222,128,0.1);padding:2px 8px;border-radius:12px;font-size:12px;margin:2px">${h.icon} 🔥${h.streak}</span>`).join(''):'<span style="font-size:12px;color:var(--text2)">Chưa có streak nào</span>';
+
+  document.getElementById('weeklyReview').innerHTML=`
+    <div style="margin-bottom:10px"><span style="font-weight:600">📝 Nhật ký:</span> ${journalDays}/7 ngày${journalBar}</div>
+    <div style="margin-bottom:10px"><span style="font-weight:600">✅ Habits:</span> ${habitPct}% (${totalDone}/${totalPossible})${habitBar}</div>
+    ${moodTrend?`<div style="margin-bottom:10px">${moodTrend}</div>`:''}
+    <div><span style="font-weight:600">🔥 Streaks:</span><div style="margin-top:4px">${streakHtml}</div></div>
+  `;
+}
+
+function renderNanaInsights(){
+  const allDates=Object.keys(state.entries).sort().reverse().slice(0,30);
+  if(allDates.length<5){document.getElementById('nanaInsightCard').style.display='none';return;}
+  document.getElementById('nanaInsightCard').style.display='block';
+  const insights=[];
+
+  // 1. Tag-Mood correlation
+  const tagMoods={};
+  allDates.forEach(d=>{
+    const e=state.entries[d];
+    if(e.tags&&e.tags.length)e.tags.forEach(t=>{
+      if(!tagMoods[t])tagMoods[t]={total:0,count:0};
+      tagMoods[t].total+=e.mood;tagMoods[t].count++;
+    });
+  });
+  const tagAvgs=Object.entries(tagMoods).filter(([_,v])=>v.count>=2).map(([tag,v])=>({tag,avg:v.total/v.count,count:v.count})).sort((a,b)=>b.avg-a.avg);
+  if(tagAvgs.length>=2){
+    const best=tagAvgs[0], worst=tagAvgs[tagAvgs.length-1];
+    if(best.avg-worst.avg>1){
+      insights.push(`💚 Khi <strong>${best.tag}</strong> → mood TB ${best.avg.toFixed(1)} | Khi <strong>${worst.tag}</strong> → mood TB ${worst.avg.toFixed(1)}`);
+    }
+  }
+
+  // 2. Best/worst day of week
+  const dowMoods={};const dowNames=['CN','T2','T3','T4','T5','T6','T7'];
+  allDates.forEach(d=>{
+    const e=state.entries[d];
+    const dow=new Date(d).getDay();
+    if(!dowMoods[dow])dowMoods[dow]={total:0,count:0};
+    dowMoods[dow].total+=e.mood;dowMoods[dow].count++;
+  });
+  const dowAvgs=Object.entries(dowMoods).filter(([_,v])=>v.count>=2).map(([d,v])=>({day:dowNames[d],avg:v.total/v.count})).sort((a,b)=>b.avg-a.avg);
+  if(dowAvgs.length>=3){
+    insights.push(`📅 Ngày vui nhất: <strong>${dowAvgs[0].day}</strong> (${dowAvgs[0].avg.toFixed(1)}) | Thấp nhất: <strong>${dowAvgs[dowAvgs.length-1].day}</strong> (${dowAvgs[dowAvgs.length-1].avg.toFixed(1)})`);
+  }
+
+  // 3. Gratitude impact
+  const withGrat=allDates.filter(d=>state.entries[d].gratitude&&state.entries[d].gratitude.length>0);
+  const noGrat=allDates.filter(d=>!state.entries[d].gratitude||!state.entries[d].gratitude.length);
+  if(withGrat.length>=3&&noGrat.length>=3){
+    const avgWith=withGrat.reduce((s,d)=>s+state.entries[d].mood,0)/withGrat.length;
+    const avgNo=noGrat.reduce((s,d)=>s+state.entries[d].mood,0)/noGrat.length;
+    if(avgWith-avgNo>0.5){
+      insights.push(`🙏 Khi ghi <strong>biết ơn</strong> → mood ${avgWith.toFixed(1)} vs không ghi → ${avgNo.toFixed(1)} (+${(avgWith-avgNo).toFixed(1)})`);
+    }
+  }
+
+  // 4. Sleep-mood correlation
+  const withSleep=allDates.filter(d=>state.entries[d].sleep);
+  if(withSleep.length>=5){
+    const goodSleep=withSleep.filter(d=>state.entries[d].sleep>=7);
+    const badSleep=withSleep.filter(d=>state.entries[d].sleep<5);
+    if(goodSleep.length>=2&&badSleep.length>=2){
+      const moodGood=goodSleep.reduce((s,d)=>s+state.entries[d].mood,0)/goodSleep.length;
+      const moodBad=badSleep.reduce((s,d)=>s+state.entries[d].mood,0)/badSleep.length;
+      if(moodGood-moodBad>1){
+        insights.push(`😴 Ngủ ngon (≥7) → mood ${moodGood.toFixed(1)} | Ngủ kém (<5) → mood ${moodBad.toFixed(1)}`);
+      }
+    }
+  }
+
+  // 5. Consistency encouragement
+  const days7=[];for(let i=0;i<7;i++)days7.push(new Date(Date.now()-i*86400000).toISOString().slice(0,10));
+  const journalStreak=days7.filter(d=>state.entries[d]).length;
+  if(journalStreak>=5)insights.push(`🌟 Anh ghi nhật ký ${journalStreak}/7 ngày — tuyệt vời lắm! Keep going!`);
+  else if(journalStreak<=2)insights.push(`💜 Anh ơi, tuần này mới ghi ${journalStreak}/7 ngày. Mỗi ngày chỉ cần 2 phút thôi nha!`);
+
+  if(!insights.length)insights.push('📊 Nana cần thêm data để phân tích. Anh ghi journal mỗi ngày nhé!');
+
+  document.getElementById('nanaInsights').innerHTML=insights.map(i=>`<div style="padding:6px 0;border-bottom:1px solid var(--border)">${i}</div>`).join('');
 }
 
 // ═══════════════════════════════════════
