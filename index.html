@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>ZakLife — Personal Dashboard</title>
+<meta name="description" content="Personal life management: journal, habits, mood tracking">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="header">
+  <h1>✦ ZakLife</h1>
+  <div class="date" id="headerDate"></div>
+</div>
+
+<!-- Bottom Navigation -->
+<nav class="bottom-nav">
+  <button class="nav-item active" onclick="switchTab('dashboard')"><span>📊</span><span>Dashboard</span></button>
+  <button class="nav-item" onclick="switchTab('journal')"><span>📝</span><span>Journal</span></button>
+  <button class="nav-item" onclick="switchTab('habits')"><span>✅</span><span>Habits</span></button>
+  <button class="nav-item" onclick="switchTab('history')"><span>📚</span><span>History</span></button>
+  <button class="nav-item" onclick="switchTab('settings')"><span>⚙️</span><span>Settings</span></button>
+</nav>
+
+<div class="content">
+
+<!-- ═══ DASHBOARD ═══ -->
+<div class="section active" id="sec-dashboard">
+  <div class="stat-row">
+    <div class="stat-box"><div class="stat-value" id="statStreak">0</div><div class="stat-label">Day Streak</div></div>
+    <div class="stat-box"><div class="stat-value" id="statMood">—</div><div class="stat-label">Avg Mood</div></div>
+    <div class="stat-box"><div class="stat-value" id="statEntries">0</div><div class="stat-label">Entries</div></div>
+  </div>
+  <div class="chart-container">
+    <div class="card-title">📈 Mood 7 ngày</div>
+    <div class="chart-bars" id="moodChart"></div>
+    <div class="chart-labels" id="moodLabels"></div>
+  </div>
+  <div class="card" id="todaySummary">
+    <div class="card-title">📋 Hôm nay</div>
+    <div id="todayContent" style="font-size:13px;color:var(--text2)">Chưa có ghi chép hôm nay. Bấm + để bắt đầu!</div>
+  </div>
+  <div class="card">
+    <div class="card-title">🎯 Habits hôm nay</div>
+    <div id="dashHabits"></div>
+  </div>
+</div>
+
+<!-- ═══ JOURNAL ═══ -->
+<div class="section" id="sec-journal">
+  <div class="card">
+    <div class="card-title">😊 Tâm trạng hôm nay</div>
+    <div class="mood-grid" id="moodGrid"></div>
+    <div style="text-align:center;margin-top:4px">
+      <span style="font-size:12px;color:var(--text2)" id="moodText">Chọn tâm trạng</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">💭 Nhật ký tâm lý</div>
+    <textarea class="journal-entry" id="journalText" placeholder="Hôm nay bạn cảm thấy thế nào? Có gì đặc biệt xảy ra?"></textarea>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🏷️ Tags</div>
+    <div class="tags" id="tagGrid"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">😴 Giấc ngủ đêm qua</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:12px;color:var(--text2)">Tệ</span>
+      <input type="range" class="sleep-slider" id="sleepScore" min="1" max="10" value="5">
+      <span style="font-size:12px;color:var(--text2)">Tuyệt</span>
+    </div>
+    <div style="text-align:center;font-size:20px;margin-top:4px" id="sleepDisplay">5/10</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🙏 3 điều biết ơn</div>
+    <input class="gratitude-input" id="grat1" placeholder="1. Tôi biết ơn..." style="margin-bottom:6px">
+    <input class="gratitude-input" id="grat2" placeholder="2. Tôi biết ơn..." style="margin-bottom:6px">
+    <input class="gratitude-input" id="grat3" placeholder="3. Tôi biết ơn...">
+  </div>
+
+  <button class="btn btn-primary" onclick="saveJournal()" style="margin-top:8px">💾 Lưu nhật ký hôm nay</button>
+</div>
+
+<!-- ═══ HABITS ═══ -->
+<div class="section" id="sec-habits">
+  <div class="card">
+    <div class="card-title">📋 Checklist hôm nay</div>
+    <div id="habitList"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">🔥 Streaks</div>
+    <div id="streakList"></div>
+  </div>
+</div>
+
+<!-- ═══ HISTORY ═══ -->
+<div class="section" id="sec-history">
+  <div style="display:flex;gap:8px;margin-bottom:12px">
+    <button class="btn btn-outline btn-sm" onclick="exportJSON()" style="flex:1">📤 Export JSON</button>
+    <button class="btn btn-outline btn-sm" onclick="exportText()" style="flex:1">📄 Export Text</button>
+  </div>
+  <div id="historyList"></div>
+</div>
+
+<!-- ═══ SETTINGS ═══ -->
+<div class="section" id="sec-settings">
+  <div class="card">
+    <div class="card-title">🎯 Quản lý Habits</div>
+    <div id="habitManager"></div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <input class="gratitude-input" id="newHabitIcon" placeholder="🐟" style="width:50px;text-align:center">
+      <input class="gratitude-input" id="newHabitName" placeholder="Tên habit mới" style="flex:1">
+      <button class="btn btn-outline btn-sm" onclick="addHabit()">+</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">🗑️ Dữ liệu</div>
+    <button class="btn btn-outline btn-sm" onclick="clearData()" style="color:var(--red);border-color:rgba(248,113,113,0.3)">Xóa toàn bộ dữ liệu</button>
+  </div>
+  <div class="card">
+    <div class="card-title">ℹ️ About</div>
+    <div style="font-size:12px;color:var(--text2)">ZakLife v1.0 — Personal Dashboard<br>Built with ❤️ by Kyoko</div>
+  </div>
+</div>
+
+</div>
+
+<!-- FAB -->
+<button class="fab" onclick="switchTab('journal')">+</button>
+
+<script>
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+const MOODS=[
+  {emoji:'😁',label:'Tuyệt',score:10},{emoji:'😊',label:'Vui',score:8},
+  {emoji:'🙂',label:'Ổn',score:6},{emoji:'😐',label:'Bình thường',score:5},
+  {emoji:'😔',label:'Buồn',score:3},{emoji:'😢',label:'Rất buồn',score:2},
+  {emoji:'😤',label:'Bực',score:4},{emoji:'😰',label:'Lo lắng',score:3},
+  {emoji:'😴',label:'Mệt',score:4},{emoji:'🤯',label:'Stress',score:2}
+];
+const TAGS=['Công việc','Gia đình','Bạn bè','Sức khỏe','Tiền bạc','Trading','Monstea','Tình yêu','Du lịch','Học tập','Tập thể dục','Thiền'];
+const DEFAULT_HABITS=[
+  {id:1,icon:'🐟',name:'Cho cá ăn'},
+  {id:2,icon:'🌱',name:'Tưới cây'},
+  {id:3,icon:'👕',name:'Giặt đồ'},
+  {id:4,icon:'💧',name:'Uống 2L nước'}
+];
+
+let state={
+  entries:{},       // {date: {mood,moodEmoji,text,tags,sleep,gratitude,timestamp}}
+  habits:[...DEFAULT_HABITS],
+  habitLog:{},      // {date: {habitId: true/false}}
+  nextHabitId:10
+};
+
+function today(){return new Date().toISOString().slice(0,10)}
+function saveState(){localStorage.setItem('zaklife',JSON.stringify(state))}
+function loadState(){try{const s=localStorage.getItem('zaklife');if(s){const p=JSON.parse(s);state={...state,...p}}}catch(e){}}
+
+// ═══════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════
+function switchTab(tab){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('sec-'+tab).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>{if(n.textContent.toLowerCase().includes(tab.slice(0,4)))n.classList.add('active')});
+  if(tab==='dashboard')renderDashboard();
+  if(tab==='journal')renderJournal();
+  if(tab==='habits')renderHabits();
+  if(tab==='history')renderHistory();
+  if(tab==='settings')renderSettings();
+}
+
+// ═══════════════════════════════════════
+// JOURNAL
+// ═══════════════════════════════════════
+let selectedMood=null;
+let selectedTags=new Set();
+
+function renderJournal(){
+  // Mood grid
+  const mg=document.getElementById('moodGrid');
+  mg.innerHTML=MOODS.map((m,i)=>`<div style="text-align:center"><button class="mood-btn ${selectedMood===i?'selected':''}" onclick="selectMood(${i})">${m.emoji}</button><div class="mood-label">${m.label}</div></div>`).join('');
+  // Tags
+  const tg=document.getElementById('tagGrid');
+  tg.innerHTML=TAGS.map(t=>`<span class="tag ${selectedTags.has(t)?'selected':''}" onclick="toggleTag('${t}')">${t}</span>`).join('');
+  // Load today's entry if exists
+  const e=state.entries[today()];
+  if(e){
+    selectedMood=MOODS.findIndex(m=>m.emoji===e.moodEmoji);
+    selectedTags=new Set(e.tags||[]);
+    document.getElementById('journalText').value=e.text||'';
+    document.getElementById('sleepScore').value=e.sleep||5;
+    document.getElementById('sleepDisplay').textContent=(e.sleep||5)+'/10';
+    if(e.gratitude){document.getElementById('grat1').value=e.gratitude[0]||'';document.getElementById('grat2').value=e.gratitude[1]||'';document.getElementById('grat3').value=e.gratitude[2]||''}
+    renderJournal();// re-render with selections
+  }
+}
+
+function selectMood(i){selectedMood=i;document.getElementById('moodText').textContent=MOODS[i].label+' ('+MOODS[i].score+'/10)';renderJournal()}
+function toggleTag(t){selectedTags.has(t)?selectedTags.delete(t):selectedTags.add(t);renderJournal()}
+
+document.getElementById('sleepScore').addEventListener('input',function(){document.getElementById('sleepDisplay').textContent=this.value+'/10'});
+
+function saveJournal(){
+  if(selectedMood===null){showToast('⚠️ Chọn tâm trạng trước!');return}
+  const m=MOODS[selectedMood];
+  state.entries[today()]={
+    mood:m.score,moodEmoji:m.emoji,moodLabel:m.label,
+    text:document.getElementById('journalText').value,
+    tags:[...selectedTags],
+    sleep:parseInt(document.getElementById('sleepScore').value),
+    gratitude:[document.getElementById('grat1').value,document.getElementById('grat2').value,document.getElementById('grat3').value].filter(g=>g),
+    timestamp:new Date().toISOString()
+  };
+  saveState();showToast('✅ Đã lưu nhật ký!');switchTab('dashboard');
+}
+
+// ═══════════════════════════════════════
+// HABITS
+// ═══════════════════════════════════════
+function renderHabits(){
+  const d=today();
+  if(!state.habitLog[d])state.habitLog[d]={};
+  const log=state.habitLog[d];
+
+  document.getElementById('habitList').innerHTML=state.habits.map(h=>{
+    const done=log[h.id];
+    return `<div class="habit-item"><div class="habit-icon">${h.icon}</div><div class="habit-info"><div class="habit-name">${h.name}</div><div class="habit-streak">Streak: ${getStreak(h.id)} ngày</div></div><button class="habit-check ${done?'done':''}" onclick="toggleHabit(${h.id})">${done?'✓':''}</button></div>`;
+  }).join('');
+
+  document.getElementById('streakList').innerHTML=state.habits.map(h=>{
+    const s=getStreak(h.id);
+    const bar=Math.min(s*10,100);
+    return `<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>${h.icon} ${h.name}</span><span style="color:var(--accent)">${s} ngày 🔥</span></div><div style="height:6px;background:var(--border);border-radius:3px"><div style="height:100%;width:${bar}%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;transition:.3s"></div></div></div>`;
+  }).join('');
+}
+
+function toggleHabit(id){
+  const d=today();
+  if(!state.habitLog[d])state.habitLog[d]={};
+  state.habitLog[d][id]=!state.habitLog[d][id];
+  saveState();renderHabits();renderDashboard();
+}
+
+function getStreak(id){
+  let streak=0;const d=new Date();
+  for(let i=0;i<365;i++){
+    const ds=new Date(d-i*86400000).toISOString().slice(0,10);
+    if(state.habitLog[ds]&&state.habitLog[ds][id])streak++;else if(i>0)break;
+  }
+  return streak;
+}
+
+// ═══════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════
+function renderDashboard(){
+  // Stats
+  const entries=Object.keys(state.entries).sort().reverse();
+  document.getElementById('statEntries').textContent=entries.length;
+
+  // Streak
+  let streak=0;const d=new Date();
+  for(let i=0;i<365;i++){
+    const ds=new Date(d-i*86400000).toISOString().slice(0,10);
+    if(state.entries[ds])streak++;else if(i>0)break;
+  }
+  document.getElementById('statStreak').textContent=streak;
+
+  // Avg mood last 7 days
+  const last7=entries.slice(0,7);
+  if(last7.length){
+    const avg=(last7.reduce((s,d)=>s+state.entries[d].mood,0)/last7.length).toFixed(1);
+    document.getElementById('statMood').textContent=avg;
+  }
+
+  // Chart
+  const chartDays=[];for(let i=6;i>=0;i--){chartDays.push(new Date(Date.now()-i*86400000).toISOString().slice(0,10))}
+  document.getElementById('moodChart').innerHTML=chartDays.map(d=>{
+    const e=state.entries[d];const h=e?(e.mood*10):0;
+    const c=e?`background:linear-gradient(to top,var(--accent),var(--accent2))`:'background:var(--border)';
+    return `<div class="chart-bar" style="height:${Math.max(h,4)}%;${c}" title="${d}: ${e?e.moodEmoji+' '+e.mood:'—'}"></div>`;
+  }).join('');
+  document.getElementById('moodLabels').innerHTML=chartDays.map(d=>`<span>${d.slice(8)}</span>`).join('');
+
+  // Today summary
+  const te=state.entries[today()];
+  if(te){
+    let html=`<div>${te.moodEmoji} <strong>${te.moodLabel}</strong> (${te.mood}/10)</div>`;
+    if(te.sleep)html+=`<div style="margin-top:4px">😴 Ngủ: ${te.sleep}/10</div>`;
+    if(te.text)html+=`<div style="margin-top:4px;font-style:italic">"${te.text.slice(0,100)}${te.text.length>100?'...':''}"</div>`;
+    if(te.gratitude&&te.gratitude.length)html+=`<div style="margin-top:4px">🙏 ${te.gratitude.length} điều biết ơn</div>`;
+    document.getElementById('todayContent').innerHTML=html;
+  }
+
+  // Habits summary
+  const dh=today();
+  if(!state.habitLog[dh])state.habitLog[dh]={};
+  const log=state.habitLog[dh];
+  const done=state.habits.filter(h=>log[h.id]).length;
+  document.getElementById('dashHabits').innerHTML=`<div style="font-size:13px;color:var(--text2);margin-bottom:8px">${done}/${state.habits.length} hoàn thành</div>`+
+    state.habits.map(h=>`<span style="font-size:20px;margin-right:4px;opacity:${log[h.id]?1:0.3}">${h.icon}</span>`).join('');
+}
+
+// ═══════════════════════════════════════
+// HISTORY
+// ═══════════════════════════════════════
+function renderHistory(){
+  const entries=Object.keys(state.entries).sort().reverse();
+  if(!entries.length){document.getElementById('historyList').innerHTML='<div style="text-align:center;color:var(--text2);padding:40px">Chưa có nhật ký nào</div>';return}
+  document.getElementById('historyList').innerHTML=entries.map(d=>{
+    const e=state.entries[d];
+    return `<div class="history-item"><div class="history-date">${d} ${e.moodEmoji} ${e.mood}/10</div>${e.sleep?`<div class="history-mood">😴 Ngủ: ${e.sleep}/10</div>`:''}${e.text?`<div class="history-text">${e.text}</div>`:''}${e.tags&&e.tags.length?`<div class="tags" style="margin-top:6px">${e.tags.map(t=>`<span class="tag selected">${t}</span>`).join('')}</div>`:''}${e.gratitude&&e.gratitude.length?`<div style="font-size:12px;color:var(--green);margin-top:6px">🙏 ${e.gratitude.join(' • ')}</div>`:''}</div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════
+function exportJSON(){
+  const data=JSON.stringify(state,null,2);
+  const blob=new Blob([data],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`zaklife_${today()}.json`;a.click();
+  showToast('📤 Đã export JSON!');
+}
+
+function exportText(){
+  const entries=Object.keys(state.entries).sort();
+  let text='=== ZAKLIFE JOURNAL EXPORT ===\n';
+  text+=`Exported: ${new Date().toISOString()}\n`;
+  text+=`Total entries: ${entries.length}\n\n`;
+  entries.forEach(d=>{
+    const e=state.entries[d];
+    text+=`--- ${d} ---\n`;
+    text+=`Mood: ${e.moodEmoji} ${e.moodLabel} (${e.mood}/10)\n`;
+    if(e.sleep)text+=`Sleep: ${e.sleep}/10\n`;
+    if(e.tags&&e.tags.length)text+=`Tags: ${e.tags.join(', ')}\n`;
+    if(e.text)text+=`Journal:\n${e.text}\n`;
+    if(e.gratitude&&e.gratitude.length)text+=`Gratitude:\n${e.gratitude.map((g,i)=>`  ${i+1}. ${g}`).join('\n')}\n`;
+    text+='\n';
+  });
+  const blob=new Blob([text],{type:'text/plain'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`zaklife_${today()}.txt`;a.click();
+  showToast('📄 Đã export Text!');
+}
+
+// ═══════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════
+function renderSettings(){
+  document.getElementById('habitManager').innerHTML=state.habits.map(h=>
+    `<div class="habit-item"><div class="habit-icon">${h.icon}</div><div class="habit-info"><div class="habit-name">${h.name}</div></div><button class="btn btn-sm btn-danger" onclick="removeHabit(${h.id})">✕</button></div>`
+  ).join('');
+}
+
+function addHabit(){
+  const icon=document.getElementById('newHabitIcon').value||'📌';
+  const name=document.getElementById('newHabitName').value;
+  if(!name){showToast('⚠️ Nhập tên habit!');return}
+  state.habits.push({id:state.nextHabitId++,icon,name});
+  saveState();renderSettings();
+  document.getElementById('newHabitIcon').value='';document.getElementById('newHabitName').value='';
+  showToast('✅ Đã thêm habit!');
+}
+
+function removeHabit(id){
+  if(!confirm('Xóa habit này?'))return;
+  state.habits=state.habits.filter(h=>h.id!==id);
+  saveState();renderSettings();
+}
+
+function clearData(){
+  if(!confirm('Xóa TOÀN BỘ dữ liệu?'))return;
+  if(!confirm('Chắc chắn chứ? Không thể khôi phục!'))return;
+  localStorage.removeItem('zaklife');location.reload();
+}
+
+// ═══════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════
+function showToast(msg){
+  const t=document.createElement('div');t.className='toast';t.textContent=msg;
+  document.body.appendChild(t);setTimeout(()=>t.remove(),2200);
+}
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+loadState();
+document.getElementById('headerDate').textContent=new Date().toLocaleDateString('vi-VN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+renderDashboard();
+</script>
+</body>
+</html>
