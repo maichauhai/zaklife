@@ -124,6 +124,8 @@
     <div class="card-title">📌 Chú thích</div>
     <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--text2)">
       <span>🐟 Cá</span><span>🌱 Cây</span><span>👕 QA 7d</span><span>🛏️ Chăn 14d</span><span>📝 Ghi chú</span>
+      <span style="color:#f87171">🔴 Số đỏ = Ngày lễ VN</span>
+      <span style="color:#fb923c">🟠 Cam = T7/CN</span>
     </div>
   </div>
   <div class="card" id="calDetail" style="display:none">
@@ -282,7 +284,61 @@ function isDueLaundry(dateStr,habit){
   return(cur-last)/(86400000)>=habit.cycle;
 }
 
+// ─── NGÀY LỄ VIỆT NAM ───
+// Dương lịch cố định: key = "MM-DD"
+const VN_FIXED_HOLIDAYS = {
+  '01-01': '🎆 Tết Dương lịch',
+  '04-30': '🇻🇳 Giải phóng miền Nam',
+  '05-01': '💪 Quốc tế Lao động',
+  '09-02': '⭐ Quốc khánh',
+  '12-24': '🎄 Giáng sinh Eve',
+  '12-25': '🎅 Giáng sinh',
+};
+
+// Lịch âm cố định theo năm
+const VN_LUNAR_HOLIDAYS_BY_YEAR = {
+  2025: {
+    '2025-01-28': '🧧 Tết Nguyên Đán (Ất Tỵ)',
+    '2025-01-29': '🧧 Tết Mồng 1',
+    '2025-01-30': '🧧 Tết Mồng 2',
+    '2025-01-31': '🧧 Tết Mồng 3',
+    '2025-02-01': '🧧 Tết Mồng 4',
+    '2025-02-02': '🧧 Tết Mồng 5',
+    '2025-04-07': '💫 Giỗ Tổ Hùng Vương',
+    '2025-10-06': '🥮 Trung Thu',
+  },
+  2026: {
+    '2026-02-17': '🧧 Giao Thừa (Bính Ngọ)',
+    '2026-02-18': '🧧 Tết Mồng 1',
+    '2026-02-19': '🧧 Tết Mồng 2',
+    '2026-02-20': '🧧 Tết Mồng 3',
+    '2026-02-21': '🧧 Tết Mồng 4',
+    '2026-02-22': '🧧 Tết Mồng 5',
+    '2026-04-26': '💫 Giỗ Tổ Hùng Vương',
+    '2026-10-17': '🥮 Trung Thu',
+  },
+  2027: {
+    '2027-02-06': '🧧 Giao Thừa (Đinh Mùi)',
+    '2027-02-07': '🧧 Tết Mồng 1',
+    '2027-02-08': '🧧 Tết Mồng 2',
+    '2027-02-09': '🧧 Tết Mồng 3',
+    '2027-02-10': '🧧 Tết Mồng 4',
+    '2027-02-11': '🧧 Tết Mồng 5',
+    '2027-04-16': '💫 Giỗ Tổ Hùng Vương',
+    '2027-10-07': '🥮 Trung Thu',
+  }
+};
+
+function getHoliday(ds) {
+  const mmdd = ds.slice(5);
+  if (VN_FIXED_HOLIDAYS[mmdd]) return VN_FIXED_HOLIDAYS[mmdd];
+  const year = parseInt(ds.slice(0,4));
+  const lunarMap = VN_LUNAR_HOLIDAYS_BY_YEAR[year] || {};
+  return lunarMap[ds] || null;
+}
+
 function renderCalendar(){
+
   const months=['Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'];
   document.getElementById('calTitle').textContent=`📅 ${months[calMonth]} ${calYear}`;
   const first=new Date(calYear,calMonth,1).getDay();
@@ -296,14 +352,29 @@ function renderCalendar(){
     const note=state.calNotes[ds];
     const isToday=ds===todayStr;
     const isSel=ds===calSelected;
+    const holiday=getHoliday(ds);
+    const dow=new Date(ds).getDay();
+    const isWeekend=dow===0||dow===6;
     let icons='';
     state.habits.forEach(h=>{if(log[h.id])icons+=h.icon});
     if(note)icons+='📝';
     // Laundry due indicators
     state.habits.filter(h=>h.cycle).forEach(h=>{if(isDueLaundry(ds,h)&&!log[h.id]&&ds>=todayStr)icons+='⚠️'});
-    const bg=isSel?'background:rgba(129,140,248,0.2);border-color:var(--accent)':isToday?'background:rgba(129,140,248,0.1)':'';
+    // Background
+    const bg=isSel
+      ?'background:rgba(129,140,248,0.2);border-color:var(--accent)'
+      :isToday?'background:rgba(129,140,248,0.1)'
+      :holiday?'background:rgba(248,113,113,0.07)':'';
+    // Màu số ngày
+    const numColor=holiday
+      ?'color:#f87171;font-weight:700'
+      :isToday?'color:var(--accent);font-weight:700'
+      :isWeekend?'color:#fb923c':'color:var(--text)';
     const notePreview=note?`<div style="font-size:8px;color:var(--accent2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;padding:0 2px">${note.slice(0,12)}</div>`:'';
-    html+=`<div onclick="selectCalDay('${ds}')" style="padding:4px 2px;border-radius:8px;text-align:center;cursor:pointer;border:1px solid ${isSel?'var(--accent)':'transparent'};min-height:48px;${bg}"><div style="font-size:13px;font-weight:${isToday?'700':'400'};color:${isToday?'var(--accent)':'var(--text)'}">${d}</div><div style="font-size:10px;line-height:1.2">${icons}</div>${notePreview}</div>`;
+    // Badge tên ngày lễ (rút gọn)
+    const holidayName=holiday?holiday.replace(/^[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\s]+/u,'').trim():'';
+    const holidayBadge=holiday?`<div style="font-size:7px;color:#f87171;line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:0 1px">${holidayName.slice(0,11)}</div>`:'';
+    html+=`<div onclick="selectCalDay('${ds}')" title="${holiday||ds}" style="padding:4px 2px;border-radius:8px;text-align:center;cursor:pointer;border:1px solid ${isSel?'var(--accent)':holiday?'rgba(248,113,113,0.3)':'transparent'};min-height:52px;${bg}"><div style="font-size:13px;${numColor}">${d}</div><div style="font-size:10px;line-height:1.2">${icons}</div>${holidayBadge}${notePreview}</div>`;
   }
   document.getElementById('calGrid').innerHTML=html;
   if(calSelected)renderCalDetail(calSelected);
@@ -318,7 +389,8 @@ function selectCalDay(ds){
 function renderCalDetail(ds){
   const d=new Date(ds);
   const weekday=['CN','T2','T3','T4','T5','T6','T7'][d.getDay()];
-  document.getElementById('calDetailTitle').textContent=`📅 ${weekday} ${ds}`;
+  const holiday=getHoliday(ds);
+  document.getElementById('calDetailTitle').textContent=`📅 ${weekday} ${ds}${holiday?' — '+holiday:''}`;
   if(!state.habitLog[ds])state.habitLog[ds]={};
   const log=state.habitLog[ds];
   let html=state.habits.map(h=>{
