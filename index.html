@@ -858,9 +858,12 @@ let vaultUnlocked=false;
 let vaultLockTimer=null;
 let currentVaultTab='pwd';
 
-// XOR obfuscation (not encryption — just hides from casual snooping)
-function vXor(str){const k='monstea';let r='';for(let i=0;i<str.length;i++)r+=String.fromCharCode(str.charCodeAt(i)^k.charCodeAt(i%k.length));return btoa(unescape(encodeURIComponent(r)));}
-function vDxor(b64){try{const str=decodeURIComponent(escape(atob(b64)));const k='monstea';let r='';for(let i=0;i<str.length;i++)r+=String.fromCharCode(str.charCodeAt(i)^k.charCodeAt(i%k.length));return r;}catch(e){return b64;}}
+// HTML escape helper (safe for Vietnamese text)
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');}
+
+// Unicode-safe XOR obfuscation using JSON + base64 (no btoa issues with Vietnamese)
+function vXor(str){const k='monstea';let r='';for(let i=0;i<str.length;i++)r+=String.fromCharCode(str.charCodeAt(i)^k.charCodeAt(i%k.length));return btoa(encodeURIComponent(r));}
+function vDxor(b64){try{const r=decodeURIComponent(atob(b64));const k='monstea';let out='';for(let i=0;i<r.length;i++)out+=String.fromCharCode(r.charCodeAt(i)^k.charCodeAt(i%k.length));return out;}catch(e){return b64;}}
 
 function loadVaultData(){try{const raw=localStorage.getItem('zkv');if(!raw)return{passwords:[],links:[],notes:[]};return JSON.parse(vDxor(raw));}catch(e){return{passwords:[],links:[],notes:[]};}}
 function saveVaultData(d){localStorage.setItem('zkv',vXor(JSON.stringify(d)));}
