@@ -23,6 +23,7 @@
   <button class="nav-item" onclick="switchTab('habits')"><span>📅</span><span>Calendar</span></button>
   <button class="nav-item" onclick="switchTab('history')"><span>📚</span><span>History</span></button>
   <button class="nav-item" onclick="switchTab('settings')"><span>⚙️</span><span>Settings</span></button>
+  <button class="nav-item" onclick="openVault()"><span>🔐</span><span>Vault</span></button>
 </nav>
 
 <div class="content">
@@ -169,6 +170,67 @@
   </div>
 </div>
 
+<!-- ═══ VAULT ═══ -->
+<div class="section" id="sec-vault">
+  <!-- Lock screen -->
+  <div id="vault-lock" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:20px">
+    <div style="font-size:64px">🔐</div>
+    <div style="font-size:1.2rem;font-weight:700;color:var(--text1)">Vault Riêng Tư</div>
+    <div style="font-size:0.82rem;color:var(--text2)">Nhập mật khẩu để mở</div>
+    <div style="display:flex;gap:10px;width:100%;max-width:280px">
+      <input type="password" id="vaultPwdInput" placeholder="Mật khẩu..." maxlength="20"
+        style="flex:1;padding:12px 16px;border-radius:14px;border:1px solid var(--border);background:var(--card);color:var(--text1);font-size:1rem;letter-spacing:4px"
+        onkeydown="if(event.key==='Enter')unlockVault()">
+      <button onclick="unlockVault()" style="padding:12px 18px;border-radius:14px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-size:1.1rem">→</button>
+    </div>
+    <div id="vault-lock-err" style="color:#f87171;font-size:0.78rem;display:none">❌ Sai mật khẩu</div>
+  </div>
+  <!-- Vault content (hidden until unlocked) -->
+  <div id="vault-content" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-size:1.1rem;font-weight:700">🔐 Vault</div>
+      <button onclick="lockVault()" style="padding:6px 14px;border-radius:10px;background:rgba(248,113,113,0.15);color:#f87171;border:none;cursor:pointer;font-size:0.78rem">🔒 Khóa</button>
+    </div>
+    <!-- Category tabs -->
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button id="vtab-pwd" class="vtab active" onclick="switchVaultTab('pwd')">🗝️ Passwords</button>
+      <button id="vtab-link" class="vtab" onclick="switchVaultTab('link')">🔗 Links</button>
+      <button id="vtab-note" class="vtab" onclick="switchVaultTab('note')">📝 Ghi chú</button>
+    </div>
+    <!-- Passwords -->
+    <div id="vpanel-pwd">
+      <div id="vault-pwd-list"></div>
+      <div class="card" style="margin-top:10px">
+        <div style="font-size:0.78rem;color:var(--text2);margin-bottom:8px">Thêm Password</div>
+        <input id="vp-site" placeholder="Tên / Website" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text1);margin-bottom:6px;font-size:0.85rem">
+        <input id="vp-user" placeholder="Username / Email" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text1);margin-bottom:6px;font-size:0.85rem">
+        <input id="vp-pass" placeholder="Mật khẩu" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text1);margin-bottom:10px;font-size:0.85rem">
+        <button onclick="vaultAddPwd()" class="btn btn-outline btn-sm" style="width:100%">➕ Thêm</button>
+      </div>
+    </div>
+    <!-- Links -->
+    <div id="vpanel-link" style="display:none">
+      <div id="vault-link-list"></div>
+      <div class="card" style="margin-top:10px">
+        <div style="font-size:0.78rem;color:var(--text2);margin-bottom:8px">Thêm Link</div>
+        <input id="vl-label" placeholder="Tên / Mô tả" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text1);margin-bottom:6px;font-size:0.85rem">
+        <input id="vl-url" placeholder="URL (https://...)" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text1);margin-bottom:10px;font-size:0.85rem">
+        <button onclick="vaultAddLink()" class="btn btn-outline btn-sm" style="width:100%">➕ Thêm</button>
+      </div>
+    </div>
+    <!-- Notes -->
+    <div id="vpanel-note" style="display:none">
+      <div id="vault-note-list"></div>
+      <div class="card" style="margin-top:10px">
+        <div style="font-size:0.78rem;color:var(--text2);margin-bottom:8px">Thêm Ghi chú</div>
+        <input id="vn-title" placeholder="Tiêu đề" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text1);margin-bottom:6px;font-size:0.85rem">
+        <textarea id="vn-body" placeholder="Nội dung..." rows="4" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text1);margin-bottom:10px;font-size:0.85rem;resize:vertical"></textarea>
+        <button onclick="vaultAddNote()" class="btn btn-outline btn-sm" style="width:100%">➕ Thêm</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 </div>
 
 <!-- FAB -->
@@ -220,6 +282,14 @@ function switchTab(tab){
   if(tab==='habits')renderHabits();
   if(tab==='history')renderHistory();
   if(tab==='settings')renderSettings();
+  if(tab==='vault'){}  // vault handled separately
+}
+function openVault(){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('sec-vault').classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>{if(n.textContent.includes('Vault'))n.classList.add('active')});
+  if(!vaultUnlocked){showVaultLock();}else{showVaultContent();}
 }
 
 // ═══════════════════════════════════════
@@ -779,6 +849,144 @@ loadState();
 document.getElementById('headerDate').textContent=new Date().toLocaleDateString('vi-VN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 initFirebase();
 renderDashboard();
+
+// ═══════════════════════════════════════
+// VAULT
+// ═══════════════════════════════════════
+const VAULT_PWD='060997';
+let vaultUnlocked=false;
+let vaultLockTimer=null;
+let currentVaultTab='pwd';
+
+// XOR obfuscation (not encryption — just hides from casual snooping)
+function vXor(str){const k='monstea';let r='';for(let i=0;i<str.length;i++)r+=String.fromCharCode(str.charCodeAt(i)^k.charCodeAt(i%k.length));return btoa(unescape(encodeURIComponent(r)));}
+function vDxor(b64){try{const str=decodeURIComponent(escape(atob(b64)));const k='monstea';let r='';for(let i=0;i<str.length;i++)r+=String.fromCharCode(str.charCodeAt(i)^k.charCodeAt(i%k.length));return r;}catch(e){return b64;}}
+
+function loadVaultData(){try{const raw=localStorage.getItem('zkv');if(!raw)return{passwords:[],links:[],notes:[]};return JSON.parse(vDxor(raw));}catch(e){return{passwords:[],links:[],notes:[]};}}
+function saveVaultData(d){localStorage.setItem('zkv',vXor(JSON.stringify(d)));}
+
+function showVaultLock(){document.getElementById('vault-lock').style.display='flex';document.getElementById('vault-content').style.display='none';setTimeout(()=>document.getElementById('vaultPwdInput')?.focus(),100);}
+function showVaultContent(){document.getElementById('vault-lock').style.display='none';document.getElementById('vault-content').style.display='block';renderVaultTab();}
+
+function unlockVault(){
+  const v=document.getElementById('vaultPwdInput').value;
+  const err=document.getElementById('vault-lock-err');
+  if(v===VAULT_PWD){
+    vaultUnlocked=true;err.style.display='none';
+    document.getElementById('vaultPwdInput').value='';
+    showVaultContent();resetVaultTimer();
+  } else {
+    err.style.display='block';
+    document.getElementById('vaultPwdInput').value='';
+    document.getElementById('vaultPwdInput').focus();
+  }
+}
+
+function lockVault(){
+  vaultUnlocked=false;clearTimeout(vaultLockTimer);
+  showVaultLock();
+}
+
+function resetVaultTimer(){
+  clearTimeout(vaultLockTimer);
+  vaultLockTimer=setTimeout(()=>{if(vaultUnlocked)lockVault();},5*60*1000); // 5 phút
+}
+
+function switchVaultTab(tab){
+  currentVaultTab=tab;
+  ['pwd','link','note'].forEach(t=>{
+    document.getElementById('vtab-'+t).classList.toggle('active',t===tab);
+    document.getElementById('vpanel-'+t).style.display=t===tab?'block':'none';
+  });
+  renderVaultTab();
+}
+
+function renderVaultTab(){
+  const d=loadVaultData();
+  // Passwords
+  const pl=document.getElementById('vault-pwd-list');
+  if(pl)pl.innerHTML=d.passwords.length?d.passwords.map((p,i)=>`
+    <div class="card" style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:600;font-size:0.9rem">${esc(p.site)}</div>
+        <button onclick="vaultDelPwd(${i})" style="background:none;border:none;cursor:pointer;color:#f87171;font-size:0.85rem">🗑️</button>
+      </div>
+      <div style="font-size:0.78rem;color:var(--text2);margin-top:4px">👤 ${esc(p.user)}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+        <div id="vpwd-${i}" style="font-size:0.82rem;font-family:monospace;background:var(--bg);padding:4px 10px;border-radius:8px;flex:1;letter-spacing:2px">••••••••</div>
+        <button onclick="vaultTogglePwd(${i},'${btoa(p.pass)}')" style="background:none;border:none;cursor:pointer;font-size:0.9rem">👁️</button>
+        <button onclick="navigator.clipboard.writeText('${p.pass.replace(/'/g,"\\'")}').then(()=>showToast('✅ Đã copy!'))" style="background:none;border:none;cursor:pointer;font-size:0.9rem">📋</button>
+      </div>
+    </div>`).join(''):'<div style="text-align:center;padding:20px;color:var(--text2);font-size:0.82rem">Chưa có password nào</div>';
+  // Links
+  const ll=document.getElementById('vault-link-list');
+  if(ll)ll.innerHTML=d.links.length?d.links.map((l,i)=>`
+    <div class="card" style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:600;font-size:0.9rem">${esc(l.label)}</div>
+        <button onclick="vaultDelLink(${i})" style="background:none;border:none;cursor:pointer;color:#f87171;font-size:0.85rem">🗑️</button>
+      </div>
+      <a href="${esc(l.url)}" target="_blank" style="font-size:0.75rem;color:var(--accent);word-break:break-all;margin-top:4px;display:block">${esc(l.url)}</a>
+      <button onclick="navigator.clipboard.writeText('${l.url.replace(/'/g,"\\'")}').then(()=>showToast('✅ Đã copy!'))" style="background:none;border:none;cursor:pointer;font-size:0.75rem;color:var(--text2);margin-top:4px">📋 Copy link</button>
+    </div>`).join(''):'<div style="text-align:center;padding:20px;color:var(--text2);font-size:0.82rem">Chưa có link nào</div>';
+  // Notes
+  const nl=document.getElementById('vault-note-list');
+  if(nl)nl.innerHTML=d.notes.length?d.notes.map((n,i)=>`
+    <div class="card" style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:600;font-size:0.9rem">${esc(n.title)}</div>
+        <button onclick="vaultDelNote(${i})" style="background:none;border:none;cursor:pointer;color:#f87171;font-size:0.85rem">🗑️</button>
+      </div>
+      <div style="font-size:0.82rem;color:var(--text2);margin-top:6px;white-space:pre-wrap;line-height:1.5">${esc(n.body)}</div>
+    </div>`).join(''):'<div style="text-align:center;padding:20px;color:var(--text2);font-size:0.82rem">Chưa có ghi chú nào</div>';
+}
+
+function vaultTogglePwd(i,b64){
+  const el=document.getElementById('vpwd-'+i);
+  if(!el)return;
+  const plain=atob(b64);
+  el.textContent=el.textContent==='••••••••'?plain:'••••••••';
+  resetVaultTimer();
+}
+
+function vaultAddPwd(){
+  const site=document.getElementById('vp-site').value.trim();
+  const user=document.getElementById('vp-user').value.trim();
+  const pass=document.getElementById('vp-pass').value.trim();
+  if(!site||!pass){showToast('⚠️ Nhập tên và mật khẩu');return;}
+  const d=loadVaultData();
+  d.passwords.push({site,user,pass});saveVaultData(d);
+  document.getElementById('vp-site').value='';document.getElementById('vp-user').value='';document.getElementById('vp-pass').value='';
+  renderVaultTab();showToast('✅ Đã lưu password!');resetVaultTimer();
+}
+function vaultDelPwd(i){if(!confirm('Xóa password này?'))return;const d=loadVaultData();d.passwords.splice(i,1);saveVaultData(d);renderVaultTab();}
+
+function vaultAddLink(){
+  const label=document.getElementById('vl-label').value.trim();
+  const url=document.getElementById('vl-url').value.trim();
+  if(!label||!url){showToast('⚠️ Nhập tên và URL');return;}
+  const d=loadVaultData();d.links.push({label,url});saveVaultData(d);
+  document.getElementById('vl-label').value='';document.getElementById('vl-url').value='';
+  renderVaultTab();showToast('✅ Đã lưu link!');resetVaultTimer();
+}
+function vaultDelLink(i){if(!confirm('Xóa link này?'))return;const d=loadVaultData();d.links.splice(i,1);saveVaultData(d);renderVaultTab();}
+
+function vaultAddNote(){
+  const title=document.getElementById('vn-title').value.trim();
+  const body=document.getElementById('vn-body').value.trim();
+  if(!title){showToast('⚠️ Nhập tiêu đề');return;}
+  const d=loadVaultData();d.notes.push({title,body});saveVaultData(d);
+  document.getElementById('vn-title').value='';document.getElementById('vn-body').value='';
+  renderVaultTab();showToast('✅ Đã lưu ghi chú!');resetVaultTimer();
+}
+function vaultDelNote(i){if(!confirm('Xóa ghi chú này?'))return;const d=loadVaultData();d.notes.splice(i,1);saveVaultData(d);renderVaultTab();}
+
+// Lock vault when page loses focus
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&vaultUnlocked)lockVault();});
 </script>
+<style>
+.vtab{padding:7px 14px;border-radius:10px;background:var(--card);border:1px solid var(--border);color:var(--text2);cursor:pointer;font-size:0.78rem;font-weight:600;transition:all .2s}
+.vtab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+</style>
 </body>
 </html>
