@@ -156,6 +156,7 @@
       <div style="display:flex;gap:8px">
         <div id="selectedIcon" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:var(--card);font-size:24px;border:2px solid var(--accent);cursor:pointer" onclick="document.getElementById('iconPicker').style.display=document.getElementById('iconPicker').style.display==='none'?'flex':'none'">📌</div>
         <input class="gratitude-input" id="newHabitName" placeholder="Tên habit mới" style="flex:1">
+        <select id="newHabitCycle" style="padding:8px 4px;border-radius:10px;background:var(--card);border:1px solid var(--border);color:var(--text1);font-size:0.78rem;min-width:55px"><option value="1">D</option><option value="2">2D</option><option value="3">3D</option><option value="7">7D</option><option value="14">14D</option><option value="30">30D</option></select>
         <button class="btn btn-outline btn-sm" onclick="addHabit()">+</button>
       </div>
     </div>
@@ -210,6 +211,7 @@
     </div>
     <!-- Links -->
     <div id="vpanel-link" style="display:none">
+      <input id="vault-link-search" placeholder="🔍 Tìm link..." oninput="renderVaultTab()" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text1);margin-bottom:10px;font-size:0.85rem">
       <div id="vault-link-list"></div>
       <div class="card" style="margin-top:10px">
         <div style="font-size:0.78rem;color:var(--text2);margin-bottom:8px">Thêm Link</div>
@@ -538,13 +540,17 @@ function renderDashboard(){
     document.getElementById('todayContent').innerHTML=html;
   }
 
-  // Habits summary
+  // Habits summary (filter: daily + cyclical due today)
   const dh=today();
   if(!state.habitLog[dh])state.habitLog[dh]={};
   const log=state.habitLog[dh];
-  const done=state.habits.filter(h=>log[h.id]).length;
-  document.getElementById('dashHabits').innerHTML=`<div style="font-size:13px;color:var(--text2);margin-bottom:8px">${done}/${state.habits.length} hoàn thành</div>`+
-    state.habits.map(h=>`<span style="font-size:20px;margin-right:4px;opacity:${log[h.id]?1:0.3}">${h.icon}</span>`).join('');
+  const todayHabits=state.habits.filter(h=>{
+    if(!h.cycle||h.cycle<=1)return true;
+    return isDueLaundry(dh,h)||log[h.id];
+  });
+  const done=todayHabits.filter(h=>log[h.id]).length;
+  document.getElementById('dashHabits').innerHTML=`<div style="font-size:13px;color:var(--text2);margin-bottom:8px">${done}/${todayHabits.length} hoàn thành</div>`+
+    todayHabits.map(h=>`<span style="font-size:20px;margin-right:4px;opacity:${log[h.id]?1:0.3}">${h.icon}</span>`).join('');
 
   // Weekly Review + Nana Insights
   renderWeeklyReview();
@@ -712,9 +718,10 @@ const HABIT_ICONS=['🐟','🌱','💧','👕','🛏️','📚','🏃','🧘','�
 let _pendingDelete=null;
 
 function renderSettings(){
-  document.getElementById('habitManager').innerHTML=state.habits.map(h=>
-    `<div class="habit-item" id="habit-${h.id}"><div class="habit-icon">${h.icon}</div><div class="habit-info"><div class="habit-name">${h.name}</div></div><button class="btn btn-sm btn-danger" onclick="removeHabit(${h.id})" style="min-width:36px;min-height:36px;font-size:16px;padding:0;display:flex;align-items:center;justify-content:center">✕</button></div>`
-  ).join('');
+  document.getElementById('habitManager').innerHTML=state.habits.map(h=>{
+    const cyc=h.cycle&&h.cycle>1?`<span style="font-size:11px;color:var(--accent);margin-left:6px;background:rgba(129,140,248,0.15);padding:1px 6px;border-radius:6px">${h.cycle}D</span>`:'';
+    return `<div class="habit-item" id="habit-${h.id}"><div class="habit-icon">${h.icon}</div><div class="habit-info"><div class="habit-name">${h.name}${cyc}</div></div><button class="btn btn-sm btn-danger" onclick="removeHabit(${h.id})" style="min-width:36px;min-height:36px;font-size:16px;padding:0;display:flex;align-items:center;justify-content:center">✕</button></div>`;
+  }).join('');
   // Render icon picker
   const picker=document.getElementById('iconPicker');
   if(picker){
@@ -733,7 +740,8 @@ function addHabit(){
   const icon=document.getElementById('newHabitIcon').value||'📌';
   const name=document.getElementById('newHabitName').value;
   if(!name){showToast('⚠️ Nhập tên habit!');return}
-  state.habits.push({id:state.nextHabitId++,icon,name});
+  const cycle=parseInt(document.getElementById('newHabitCycle').value)||1;
+  state.habits.push({id:state.nextHabitId++,icon,name,...(cycle>1?{cycle}:{})});
   saveState();renderSettings();
   document.getElementById('newHabitName').value='';
   document.getElementById('newHabitIcon').value='📌';
@@ -857,6 +865,7 @@ const VAULT_PWD='060997';
 let vaultUnlocked=false;
 let vaultLockTimer=null;
 let currentVaultTab='pwd';
+let vaultEditIdx=-1;let vaultEditType=null;
 
 // HTML escape helper (safe for Vietnamese text)
 function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');}
@@ -912,7 +921,10 @@ function renderVaultTab(){
     <div class="card" style="margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div style="font-weight:600;font-size:0.9rem">${esc(p.site)}</div>
-        <button onclick="vaultDelPwd(${i})" style="background:none;border:none;cursor:pointer;color:#f87171;font-size:0.85rem">🗑️</button>
+        <div style="display:flex;gap:4px">
+          <button onclick="vaultEditPwd(${i})" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:0.85rem">✏️</button>
+          <button onclick="vaultDelPwd(${i})" style="background:none;border:none;cursor:pointer;color:#f87171;font-size:0.85rem">🗑️</button>
+        </div>
       </div>
       <div style="font-size:0.78rem;color:var(--text2);margin-top:4px">👤 ${esc(p.user)}</div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
@@ -921,24 +933,35 @@ function renderVaultTab(){
         <button onclick="navigator.clipboard.writeText('${p.pass.replace(/'/g,"\\'")}').then(()=>showToast('✅ Đã copy!'))" style="background:none;border:none;cursor:pointer;font-size:0.9rem">📋</button>
       </div>
     </div>`).join(''):'<div style="text-align:center;padding:20px;color:var(--text2);font-size:0.82rem">Chưa có password nào</div>';
-  // Links
+  // Links (with search)
   const ll=document.getElementById('vault-link-list');
-  if(ll)ll.innerHTML=d.links.length?d.links.map((l,i)=>`
+  if(ll){
+    const sq=(document.getElementById('vault-link-search')?.value||'').toLowerCase();
+    const filtered=d.links.map((l,i)=>({...l,_i:i})).filter(l=>!sq||l.label.toLowerCase().includes(sq)||l.url.toLowerCase().includes(sq));
+    const countHtml=`<div style="font-size:0.75rem;color:var(--text2);margin-bottom:8px">${filtered.length}/${d.links.length} links</div>`;
+    ll.innerHTML=countHtml+(filtered.length?filtered.map(l=>`
     <div class="card" style="margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div style="font-weight:600;font-size:0.9rem">${esc(l.label)}</div>
-        <button onclick="vaultDelLink(${i})" style="background:none;border:none;cursor:pointer;color:#f87171;font-size:0.85rem">🗑️</button>
+        <div style="display:flex;gap:4px">
+          <button onclick="vaultEditLink(${l._i})" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:0.85rem">✏️</button>
+          <button onclick="vaultDelLink(${l._i})" style="background:none;border:none;cursor:pointer;color:#f87171;font-size:0.85rem">🗑️</button>
+        </div>
       </div>
       <a href="${esc(l.url)}" target="_blank" style="font-size:0.75rem;color:var(--accent);word-break:break-all;margin-top:4px;display:block">${esc(l.url)}</a>
       <button onclick="navigator.clipboard.writeText('${l.url.replace(/'/g,"\\'")}').then(()=>showToast('✅ Đã copy!'))" style="background:none;border:none;cursor:pointer;font-size:0.75rem;color:var(--text2);margin-top:4px">📋 Copy link</button>
-    </div>`).join(''):'<div style="text-align:center;padding:20px;color:var(--text2);font-size:0.82rem">Chưa có link nào</div>';
+    </div>`).join(''):'<div style="text-align:center;padding:20px;color:var(--text2);font-size:0.82rem">Không tìm thấy</div>');
+  }
   // Notes
   const nl=document.getElementById('vault-note-list');
   if(nl)nl.innerHTML=d.notes.length?d.notes.map((n,i)=>`
     <div class="card" style="margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div style="font-weight:600;font-size:0.9rem">${esc(n.title)}</div>
-        <button onclick="vaultDelNote(${i})" style="background:none;border:none;cursor:pointer;color:#f87171;font-size:0.85rem">🗑️</button>
+        <div style="display:flex;gap:4px">
+          <button onclick="vaultEditNote(${i})" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:0.85rem">✏️</button>
+          <button onclick="vaultDelNote(${i})" style="background:none;border:none;cursor:pointer;color:#f87171;font-size:0.85rem">🗑️</button>
+        </div>
       </div>
       <div style="font-size:0.82rem;color:var(--text2);margin-top:6px;white-space:pre-wrap;line-height:1.5">${esc(n.body)}</div>
     </div>`).join(''):'<div style="text-align:center;padding:20px;color:var(--text2);font-size:0.82rem">Chưa có ghi chú nào</div>';
@@ -958,31 +981,42 @@ function vaultAddPwd(){
   const pass=document.getElementById('vp-pass').value.trim();
   if(!site||!pass){showToast('⚠️ Nhập tên và mật khẩu');return;}
   const d=loadVaultData();
-  d.passwords.push({site,user,pass});saveVaultData(d);
+  if(vaultEditType==='pwd'&&vaultEditIdx>=0){d.passwords[vaultEditIdx]={site,user,pass};vaultEditIdx=-1;vaultEditType=null;}
+  else{d.passwords.push({site,user,pass});}
+  saveVaultData(d);
   document.getElementById('vp-site').value='';document.getElementById('vp-user').value='';document.getElementById('vp-pass').value='';
   renderVaultTab();showToast('✅ Đã lưu password!');resetVaultTimer();
 }
 function vaultDelPwd(i){if(!confirm('Xóa password này?'))return;const d=loadVaultData();d.passwords.splice(i,1);saveVaultData(d);renderVaultTab();}
+function vaultEditPwd(i){const d=loadVaultData();const p=d.passwords[i];if(!p)return;document.getElementById('vp-site').value=p.site;document.getElementById('vp-user').value=p.user;document.getElementById('vp-pass').value=p.pass;vaultEditIdx=i;vaultEditType='pwd';showToast('✏️ Sửa xong bấm Thêm');resetVaultTimer();}
 
 function vaultAddLink(){
   const label=document.getElementById('vl-label').value.trim();
   const url=document.getElementById('vl-url').value.trim();
   if(!label||!url){showToast('⚠️ Nhập tên và URL');return;}
-  const d=loadVaultData();d.links.push({label,url});saveVaultData(d);
+  const d=loadVaultData();
+  if(vaultEditType==='link'&&vaultEditIdx>=0){d.links[vaultEditIdx]={label,url};vaultEditIdx=-1;vaultEditType=null;}
+  else{d.links.push({label,url});}
+  saveVaultData(d);
   document.getElementById('vl-label').value='';document.getElementById('vl-url').value='';
   renderVaultTab();showToast('✅ Đã lưu link!');resetVaultTimer();
 }
 function vaultDelLink(i){if(!confirm('Xóa link này?'))return;const d=loadVaultData();d.links.splice(i,1);saveVaultData(d);renderVaultTab();}
+function vaultEditLink(i){const d=loadVaultData();const l=d.links[i];if(!l)return;document.getElementById('vl-label').value=l.label;document.getElementById('vl-url').value=l.url;vaultEditIdx=i;vaultEditType='link';showToast('✏️ Sửa xong bấm Thêm');resetVaultTimer();}
 
 function vaultAddNote(){
   const title=document.getElementById('vn-title').value.trim();
   const body=document.getElementById('vn-body').value.trim();
   if(!title){showToast('⚠️ Nhập tiêu đề');return;}
-  const d=loadVaultData();d.notes.push({title,body});saveVaultData(d);
+  const d=loadVaultData();
+  if(vaultEditType==='note'&&vaultEditIdx>=0){d.notes[vaultEditIdx]={title,body};vaultEditIdx=-1;vaultEditType=null;}
+  else{d.notes.push({title,body});}
+  saveVaultData(d);
   document.getElementById('vn-title').value='';document.getElementById('vn-body').value='';
   renderVaultTab();showToast('✅ Đã lưu ghi chú!');resetVaultTimer();
 }
 function vaultDelNote(i){if(!confirm('Xóa ghi chú này?'))return;const d=loadVaultData();d.notes.splice(i,1);saveVaultData(d);renderVaultTab();}
+function vaultEditNote(i){const d=loadVaultData();const n=d.notes[i];if(!n)return;document.getElementById('vn-title').value=n.title;document.getElementById('vn-body').value=n.body;vaultEditIdx=i;vaultEditType='note';showToast('✏️ Sửa xong bấm Thêm');resetVaultTimer();}
 
 // Lock vault when page loses focus
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&vaultUnlocked)lockVault();});
