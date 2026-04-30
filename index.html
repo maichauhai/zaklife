@@ -463,8 +463,8 @@ function renderCalendar(){
     let icons='';
     state.habits.forEach(h=>{if(log[h.id])icons+=h.icon});
     if(note)icons+='📝';
-    // Laundry due indicators
-    state.habits.filter(h=>h.cycle).forEach(h=>{if(isDueLaundry(ds,h)&&!log[h.id]&&ds>=todayStr)icons+='⚠️'});
+    // Overdue indicator (max 1 per day)
+    if(state.habits.filter(h=>h.cycle).some(h=>isDueLaundry(ds,h)&&!log[h.id]&&ds>=todayStr))icons+='⚠️';
     // US Economic events
     const econ=getEconEvent(ds);
     if(econ)icons+=econ.split(' ')[0];
