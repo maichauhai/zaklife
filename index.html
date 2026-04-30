@@ -270,7 +270,20 @@ let calMonth=new Date().getMonth(), calYear=new Date().getFullYear(), calSelecte
 
 function today(){return new Date().toISOString().slice(0,10)}
 function saveState(){localStorage.setItem('zaklife',JSON.stringify(state))}
-function loadState(){try{const s=localStorage.getItem('zaklife');if(s){const p=JSON.parse(s);state={...state,...p}}}catch(e){}}
+function loadState(){
+  try{
+    const s=localStorage.getItem('zaklife');
+    if(s){const p=JSON.parse(s);state={...state,...p}}
+    // Fix: recalculate nextHabitId from max existing ID to prevent duplicates
+    if(state.habits.length){
+      const maxId=Math.max(...state.habits.map(h=>h.id));
+      if(state.nextHabitId<=maxId)state.nextHabitId=maxId+1;
+    }
+    // Fix: deduplicate habits by ID (keep last occurrence)
+    const seen=new Set();
+    state.habits=state.habits.filter(h=>{if(seen.has(h.id))return false;seen.add(h.id);return true;});
+  }catch(e){}
+}
 
 // ═══════════════════════════════════════
 // NAVIGATION
