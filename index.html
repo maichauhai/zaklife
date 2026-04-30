@@ -127,6 +127,7 @@
       <span>🐟 Cá</span><span>🌱 Cây</span><span>👕 QA 7d</span><span>🛏️ Chăn 14d</span><span>📝 Ghi chú</span>
       <span style="color:#f87171">🔴 Số đỏ = Ngày lễ VN</span>
       <span style="color:#fb923c">🟠 Cam = T7/CN</span>
+      <span style="color:#60a5fa">🏦📊📈💰 = Lịch KT Mỹ</span>
     </div>
   </div>
   <div class="card" id="calDetail" style="display:none">
@@ -212,13 +213,13 @@
     <!-- Links -->
     <div id="vpanel-link" style="display:none">
       <input id="vault-link-search" placeholder="🔍 Tìm link..." oninput="renderVaultTab()" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text1);margin-bottom:10px;font-size:0.85rem">
-      <div id="vault-link-list"></div>
-      <div class="card" style="margin-top:10px">
+      <div class="card" style="margin-bottom:10px">
         <div style="font-size:0.78rem;color:var(--text2);margin-bottom:8px">Thêm Link</div>
         <input id="vl-label" placeholder="Tên / Mô tả" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text1);margin-bottom:6px;font-size:0.85rem">
         <input id="vl-url" placeholder="URL (https://...)" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text1);margin-bottom:10px;font-size:0.85rem">
         <button onclick="vaultAddLink()" class="btn btn-outline btn-sm" style="width:100%">➕ Thêm</button>
       </div>
+      <div id="vault-link-list"></div>
     </div>
     <!-- Notes -->
     <div id="vpanel-note" style="display:none">
@@ -409,6 +410,30 @@ function getHoliday(ds) {
   return lunarMap[ds] || null;
 }
 
+// ─── LỊCH KINH TẾ MỸ (giờ VN) ───
+const US_ECON_EVENTS = {
+  // FOMC - Quyết định lãi suất (~1-2h sáng VN)
+  '2026-01-28':'🏦 FOMC 2h','2026-03-18':'🏦 FOMC 1h','2026-05-06':'🏦 FOMC 1h',
+  '2026-06-17':'🏦 FOMC 1h','2026-07-29':'🏦 FOMC 1h','2026-09-16':'🏦 FOMC 1h',
+  '2026-11-04':'🏦 FOMC 2h','2026-12-16':'🏦 FOMC 2h',
+  // NFP - Non-Farm Payrolls (~19:30-20:30 VN)
+  '2026-01-02':'📊 NFP 20:30','2026-02-06':'📊 NFP 20:30','2026-03-06':'📊 NFP 20:30',
+  '2026-04-03':'📊 NFP 19:30','2026-05-01':'📊 NFP 19:30','2026-06-05':'📊 NFP 19:30',
+  '2026-07-03':'📊 NFP 19:30','2026-08-07':'📊 NFP 19:30','2026-09-04':'📊 NFP 19:30',
+  '2026-10-02':'📊 NFP 19:30','2026-11-06':'📊 NFP 20:30','2026-12-04':'📊 NFP 20:30',
+  // CPI - Consumer Price Index (~19:30-20:30 VN)
+  '2026-01-14':'📈 CPI 20:30','2026-02-11':'📈 CPI 20:30','2026-03-11':'📈 CPI 19:30',
+  '2026-04-14':'📈 CPI 19:30','2026-05-13':'📈 CPI 19:30','2026-06-10':'📈 CPI 19:30',
+  '2026-07-14':'📈 CPI 19:30','2026-08-12':'📈 CPI 19:30','2026-09-10':'📈 CPI 19:30',
+  '2026-10-13':'📈 CPI 19:30','2026-11-12':'📈 CPI 20:30','2026-12-10':'📈 CPI 20:30',
+  // PCE - Personal Consumption Expenditures (~19:30-20:30 VN)
+  '2026-01-30':'💰 PCE 20:30','2026-02-27':'💰 PCE 20:30','2026-03-27':'💰 PCE 19:30',
+  '2026-04-30':'💰 PCE 19:30','2026-05-29':'💰 PCE 19:30','2026-06-26':'💰 PCE 19:30',
+  '2026-07-31':'💰 PCE 19:30','2026-08-28':'💰 PCE 19:30','2026-09-25':'💰 PCE 19:30',
+  '2026-10-30':'💰 PCE 19:30','2026-11-27':'💰 PCE 20:30','2026-12-23':'💰 PCE 20:30',
+};
+function getEconEvent(ds){return US_ECON_EVENTS[ds]||null;}
+
 function renderCalendar(){
 
   const months=['Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'];
@@ -432,11 +457,15 @@ function renderCalendar(){
     if(note)icons+='📝';
     // Laundry due indicators
     state.habits.filter(h=>h.cycle).forEach(h=>{if(isDueLaundry(ds,h)&&!log[h.id]&&ds>=todayStr)icons+='⚠️'});
+    // US Economic events
+    const econ=getEconEvent(ds);
+    if(econ)icons+=econ.split(' ')[0];
     // Background
     const bg=isSel
       ?'background:rgba(129,140,248,0.2);border-color:var(--accent)'
       :isToday?'background:rgba(129,140,248,0.1)'
-      :holiday?'background:rgba(248,113,113,0.07)':'';
+      :holiday?'background:rgba(248,113,113,0.07)'
+      :econ?'background:rgba(96,165,250,0.06)':'';
     // Màu số ngày
     const numColor=holiday
       ?'color:#f87171;font-weight:700'
@@ -446,7 +475,8 @@ function renderCalendar(){
     // Badge tên ngày lễ (rút gọn)
     const holidayName=holiday?holiday.replace(/^[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\s]+/u,'').trim():'';
     const holidayBadge=holiday?`<div style="font-size:7px;color:#f87171;line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:0 1px">${holidayName.slice(0,11)}</div>`:'';
-    html+=`<div onclick="selectCalDay('${ds}')" title="${holiday||ds}" style="padding:4px 2px;border-radius:8px;text-align:center;cursor:pointer;border:1px solid ${isSel?'var(--accent)':holiday?'rgba(248,113,113,0.3)':'transparent'};min-height:52px;${bg}"><div style="font-size:13px;${numColor}">${d}</div><div style="font-size:10px;line-height:1.2">${icons}</div>${holidayBadge}${notePreview}</div>`;
+    const econBadge=econ&&!holiday?`<div style="font-size:7px;color:#60a5fa;line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:0 1px">${econ.replace(/^.{1,2} /,'').slice(0,10)}</div>`:'';
+    html+=`<div onclick="selectCalDay('${ds}')" title="${econ||holiday||ds}" style="padding:4px 2px;border-radius:8px;text-align:center;cursor:pointer;border:1px solid ${isSel?'var(--accent)':holiday?'rgba(248,113,113,0.3)':econ?'rgba(96,165,250,0.2)':'transparent'};min-height:52px;${bg}"><div style="font-size:13px;${numColor}">${d}</div><div style="font-size:10px;line-height:1.2">${icons}</div>${holidayBadge}${econBadge}${notePreview}</div>`;
   }
   document.getElementById('calGrid').innerHTML=html;
   if(calSelected)renderCalDetail(calSelected);
@@ -462,7 +492,8 @@ function renderCalDetail(ds){
   const d=new Date(ds);
   const weekday=['CN','T2','T3','T4','T5','T6','T7'][d.getDay()];
   const holiday=getHoliday(ds);
-  document.getElementById('calDetailTitle').textContent=`📅 ${weekday} ${ds}${holiday?' — '+holiday:''}`;
+  const econ=getEconEvent(ds);
+  document.getElementById('calDetailTitle').textContent=`📅 ${weekday} ${ds}${holiday?' — '+holiday:''}${econ?' — '+econ:''}`;
   if(!state.habitLog[ds])state.habitLog[ds]={};
   const log=state.habitLog[ds];
   let html=state.habits.map(h=>{
