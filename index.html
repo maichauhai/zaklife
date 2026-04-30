@@ -433,6 +433,14 @@ const US_ECON_EVENTS = {
   '2026-10-30':'💰 PCE 19:30','2026-11-27':'💰 PCE 20:30','2026-12-23':'💰 PCE 20:30',
 };
 function getEconEvent(ds){return US_ECON_EVENTS[ds]||null;}
+// Live data from Firebase (cron sync) — merged on top of hardcoded
+let liveEconEvents={};
+function getEconEvents(ds){
+  // Return array of events for a date (from Firebase or hardcoded fallback)
+  if(liveEconEvents[ds])return liveEconEvents[ds];
+  const hc=US_ECON_EVENTS[ds];
+  return hc?[{title:hc.split(' ').slice(1).join(' '),icon:hc.split(' ')[0],time:hc.split(' ').pop()}]:[];
+}
 
 function renderCalendar(){
 
@@ -492,10 +500,21 @@ function renderCalDetail(ds){
   const d=new Date(ds);
   const weekday=['CN','T2','T3','T4','T5','T6','T7'][d.getDay()];
   const holiday=getHoliday(ds);
-  const econ=getEconEvent(ds);
-  document.getElementById('calDetailTitle').textContent=`📅 ${weekday} ${ds}${holiday?' — '+holiday:''}${econ?' — '+econ:''}`;
+  const econEvts=getEconEvents(ds);
+  document.getElementById('calDetailTitle').textContent=`📅 ${weekday} ${ds}${holiday?' — '+holiday:''}`;
   if(!state.habitLog[ds])state.habitLog[ds]={};
   const log=state.habitLog[ds];
+  // Economic events block
+  let econHtml='';
+  if(econEvts.length){
+    econHtml=`<div style="margin-bottom:10px;padding:8px 10px;border-radius:10px;background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.2)">
+      <div style="font-size:12px;font-weight:600;color:#60a5fa;margin-bottom:6px">🇺🇸 Lịch kinh tế Mỹ</div>
+      ${econEvts.map(e=>`<div style="font-size:12px;color:var(--text1);padding:3px 0;display:flex;justify-content:space-between">
+        <span>${e.icon} ${e.title}</span>
+        <span style="color:#60a5fa;font-weight:600">${e.time} VN</span>
+      </div>${e.forecast?`<div style="font-size:11px;color:var(--text2);padding-left:20px">Dự báo: ${e.forecast} | Trước: ${e.previous||'—'}</div>`:''}`).join('')}
+    </div>`;
+  }
   let html=state.habits.map(h=>{
     const done=log[h.id];
     let extra='';
@@ -504,7 +523,7 @@ function renderCalDetail(ds){
   }).join('');
   const note=state.calNotes[ds]||'';
   html+=`<div style="margin-top:10px"><div style="font-size:12px;color:var(--text2);margin-bottom:4px">📝 Ghi chú:</div><textarea class="journal-entry" style="min-height:60px" placeholder="Ghi chú cho ngày này..." onchange="saveCalNote('${ds}',this.value)">${note}</textarea></div>`;
-  document.getElementById('calDetailBody').innerHTML=html;
+  document.getElementById('calDetailBody').innerHTML=econHtml+html;
 }
 
 function toggleHabitCal(ds,id){
@@ -832,6 +851,11 @@ function initFirebase(){
     fbDb.ref('zaklife/nana_messages').on('value',snap=>{
       const msgs=snap.val();
       renderNanaMessages(msgs);
+    });
+    // Listen for economic events (from cron sync)
+    fbDb.ref('zaklife/econ_events').on('value',snap=>{
+      const data=snap.val();
+      if(data){liveEconEvents=data;logger('Econ events synced: '+Object.keys(data).length+' dates');renderCalendar();}
     });
     // Initial sync: pull from Firebase
     fbDb.ref('zaklife/data').once('value',snap=>{
