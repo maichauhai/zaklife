@@ -882,6 +882,7 @@ function initFirebase(){
         localStorage.setItem('zaklife',JSON.stringify(state));
         renderDashboard();
         logger('Synced from Firebase');
+        restoreVaultFromFirebase();
       }
     });
   }catch(e){logger('Firebase error: '+e)}
@@ -942,8 +943,36 @@ function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/<
 function vXor(str){const k='monstea';let r='';for(let i=0;i<str.length;i++)r+=String.fromCharCode(str.charCodeAt(i)^k.charCodeAt(i%k.length));return btoa(encodeURIComponent(r));}
 function vDxor(b64){try{const r=decodeURIComponent(atob(b64));const k='monstea';let out='';for(let i=0;i<r.length;i++)out+=String.fromCharCode(r.charCodeAt(i)^k.charCodeAt(i%k.length));return out;}catch(e){return b64;}}
 
-function loadVaultData(){try{const raw=localStorage.getItem('zkv');if(!raw)return{passwords:[],links:[],notes:[]};return JSON.parse(vDxor(raw));}catch(e){return{passwords:[],links:[],notes:[]};}}
-function saveVaultData(d){localStorage.setItem('zkv',vXor(JSON.stringify(d)));}
+function loadVaultData(){
+  try{
+    const raw=localStorage.getItem('zkv');
+    if(raw) return JSON.parse(vDxor(raw));
+    // localStorage empty — try Firebase restore
+    return{passwords:[],links:[],notes:[]};
+  }catch(e){return{passwords:[],links:[],notes:[]};}
+}
+
+function saveVaultData(d){
+  const encrypted=vXor(JSON.stringify(d));
+  localStorage.setItem('zkv',encrypted);
+  // Sync encrypted vault to Firebase
+  if(fbDb){fbDb.ref('zaklife/vault_encrypted').set({data:encrypted,ts:new Date().toISOString()});}
+}
+
+// Restore vault from Firebase (called after Firebase connects)
+function restoreVaultFromFirebase(){
+  if(!fbDb)return;
+  const localRaw=localStorage.getItem('zkv');
+  if(localRaw)return; // Already have local data, skip
+  fbDb.ref('zaklife/vault_encrypted').once('value',snap=>{
+    const remote=snap.val();
+    if(remote&&remote.data){
+      localStorage.setItem('zkv',remote.data);
+      logger('Vault restored from Firebase');
+    }
+  });
+}
+
 
 function showVaultLock(){document.getElementById('vault-lock').style.display='flex';document.getElementById('vault-content').style.display='none';setTimeout(()=>document.getElementById('vaultPwdInput')?.focus(),100);}
 function showVaultContent(){document.getElementById('vault-lock').style.display='none';document.getElementById('vault-content').style.display='block';renderVaultTab();}
