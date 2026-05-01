@@ -959,16 +959,24 @@ function saveVaultData(d){
   if(fbDb){fbDb.ref('zaklife/vault_encrypted').set({data:encrypted,ts:new Date().toISOString()});}
 }
 
-// Restore vault from Firebase (called after Firebase connects)
+// Sync vault bidirectionally on Firebase connect
 function restoreVaultFromFirebase(){
   if(!fbDb)return;
   const localRaw=localStorage.getItem('zkv');
-  if(localRaw)return; // Already have local data, skip
   fbDb.ref('zaklife/vault_encrypted').once('value',snap=>{
     const remote=snap.val();
-    if(remote&&remote.data){
+    if(localRaw && (!remote || !remote.data)){
+      // Local has data, Firebase empty → push local to Firebase
+      fbDb.ref('zaklife/vault_encrypted').set({data:localRaw,ts:new Date().toISOString()});
+      logger('Vault pushed to Firebase (first sync)');
+    } else if(!localRaw && remote && remote.data){
+      // Local empty, Firebase has data → restore from Firebase
       localStorage.setItem('zkv',remote.data);
       logger('Vault restored from Firebase');
+      if(vaultUnlocked)renderVaultTab();
+    } else if(localRaw && remote && remote.data){
+      // Both have data → keep local, but ensure Firebase is up to date
+      logger('Vault exists both locally and on Firebase');
     }
   });
 }
