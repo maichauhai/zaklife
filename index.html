@@ -35,6 +35,20 @@
     <div class="card-title"><img src="nana-avatar.png" style="width:24px;height:24px;border-radius:50%;object-fit:cover;vertical-align:middle"> Nana nhắn gửi</div>
     <div id="nanaMessages" style="font-size:13px;color:var(--text2)"></div>
   </div>
+
+  <!-- AI Agent Status -->
+  <div class="card" id="agentCard" style="border-color:rgba(96,165,250,0.3);background:rgba(96,165,250,0.04)">
+    <div class="card-title">🤖 AI Team</div>
+    <div id="agentList" style="font-size:13px;color:var(--text2)">Đang kết nối...</div>
+  </div>
+
+  <!-- Monstea Daily -->
+  <div class="card" id="monsteaCard" style="border-color:rgba(232,166,53,0.3);background:rgba(232,166,53,0.04)">
+    <div class="card-title">🍵 Monstea hôm nay</div>
+    <div id="monsteaStats" style="font-size:13px;color:var(--text2)">Đang tải...</div>
+    <div id="monsteaNotes" style="margin-top:8px"></div>
+  </div>
+
   <div class="stat-row">
     <div class="stat-box"><div class="stat-value" id="statStreak">0</div><div class="stat-label">Day Streak</div></div>
     <div class="stat-box"><div class="stat-value" id="statMood">—</div><div class="stat-label">Avg Mood</div></div>
@@ -968,6 +982,23 @@ function initFirebase(){
         restoreVaultFromFirebase();
       }
     });
+    // Listen for AI agent status
+    fbDb.ref('zaklife/agents').on('value',snap=>{
+      renderAgentCard(snap.val());
+    });
+    // Listen for Monstea data (invoices + notes)
+    fbDb.ref('state/todayInvoices').on('value',snap=>{
+      _monsteaInvoices=snap.val()||[];
+      renderMonsteaCard();
+    });
+    fbDb.ref('state/dailyNotes').on('value',snap=>{
+      _monsteaNotes=snap.val()||[];
+      renderMonsteaCard();
+    });
+    fbDb.ref('state/history').once('value',snap=>{
+      _monsteaHistory=snap.val()||{};
+      renderMonsteaCard();
+    });
   }catch(e){logger('Firebase error: '+e)}
 }
 
@@ -1003,6 +1034,89 @@ function renderNanaMessages(msgs){
 }
 
 function logger(msg){console.log('[ZakLife]',msg)}
+
+// ═══════════════════════════════════════
+// AGENT STATUS CARD
+// ═══════════════════════════════════════
+function renderAgentCard(data){
+  const el=document.getElementById('agentList');
+  if(!data){el.innerHTML='<div style="text-align:center;padding:8px;opacity:0.5">Chưa có dữ liệu agent</div>';return;}
+  const agents=['kyoko','nana','longnhi'];
+  const labels={kyoko:'Kyoko',nana:'Nana',longnhi:'Long Nhi'};
+  const icons={kyoko:'🦊',nana:'🐱',longnhi:'🐉'};
+  const now=Date.now();
+  el.innerHTML=agents.map(name=>{
+    const a=data[name];
+    if(!a)return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span>🔴</span><strong>${labels[name]}</strong> <span style="flex:1"></span><span style="font-size:11px;color:var(--text2)">Chưa kết nối</span></div>`;
+    const diff=now-new Date(a.lastSeen).getTime();
+    const mins=Math.floor(diff/60000);
+    let dot='🟢',statusText='Online';
+    if(mins>60){dot='🔴';statusText=mins>1440?Math.floor(mins/1440)+'d trước':Math.floor(mins/60)+'h trước';}
+    else if(mins>10){dot='🟡';statusText=mins+'m trước';}
+    else{statusText='vừa xong';}
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:16px">${icons[name]}</span>
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:6px"><strong>${labels[name]}</strong><span style="font-size:10px">${dot}</span><span style="font-size:11px;color:var(--text2)">${statusText}</span></div>
+        ${a.lastTask?`<div style="font-size:11px;color:var(--text2);margin-top:2px">└ ${a.lastTask}</div>`:''}
+      </div>
+      ${a.taskCount?`<span style="font-size:11px;background:rgba(96,165,250,0.15);color:var(--accent);padding:2px 6px;border-radius:8px">${a.taskCount} tasks</span>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════
+// MONSTEA DAILY CARD + NOTES
+// ═══════════════════════════════════════
+let _monsteaInvoices=[],_monsteaNotes=[],_monsteaHistory={};
+function _todayKey(){return new Date().toISOString().slice(0,10)}
+function _fmtVND(n){return n?n.toLocaleString('vi-VN')+'đ':'0đ'}
+
+function renderMonsteaCard(){
+  const statsEl=document.getElementById('monsteaStats');
+  const notesEl=document.getElementById('monsteaNotes');
+  const td=_todayKey();
+  // Calc revenue from todayInvoices
+  const todayInv=Array.isArray(_monsteaInvoices)?_monsteaInvoices.filter(i=>i&&i.date===td&&!i.cancelled&&i.method!=='staff'):[];
+  const revenue=todayInv.reduce((s,i)=>s+(i.total||0),0);
+  const count=todayInv.length;
+  // Yesterday comparison
+  const yd=new Date();yd.setDate(yd.getDate()-1);const ydk=yd.toISOString().slice(0,10);
+  const ydData=_monsteaHistory[ydk];
+  let cmpHtml='';
+  if(ydData&&ydData.totalRevenue>0){
+    const pct=Math.round((revenue-ydData.totalRevenue)/ydData.totalRevenue*100);
+    cmpHtml=` <span style="font-size:11px;color:${pct>=0?'var(--green,#4ade80)':'var(--red,#ff6b6b)'}">${pct>=0?'📈 +':'📉 '}${pct}% vs hôm qua</span>`;
+  }
+  statsEl.innerHTML=`<div style="display:flex;gap:16px;align-items:baseline"><span style="font-size:18px;font-weight:700;color:var(--accent,#e8a635)">${_fmtVND(revenue)}</span><span style="font-size:12px;color:var(--text2)">📊 ${count} đơn</span>${cmpHtml}</div>`;
+  // Notes — only active (not done)
+  const activeNotes=Array.isArray(_monsteaNotes)?_monsteaNotes.filter(n=>n&&!n.done):[];
+  if(!activeNotes.length){notesEl.innerHTML='';return;}
+  notesEl.innerHTML=`<div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:4px">📝 Ghi chú (${activeNotes.length})</div>`+
+    activeNotes.map(n=>{
+      return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="toggleMonsteaNote(${n.id})">
+        <span style="font-size:14px;opacity:0.4">☐</span>
+        <span style="flex:1;font-size:12px">${n.text||''}</span>
+        <span style="font-size:10px;color:var(--text2)">${n.time||''}</span>
+      </div>`;
+    }).join('');
+}
+
+function toggleMonsteaNote(noteId){
+  if(!fbDb)return;
+  // Find note index in the array
+  const idx=_monsteaNotes.findIndex(n=>n&&n.id===noteId);
+  if(idx===-1)return;
+  // Toggle done status + set doneDate
+  const isDone=!_monsteaNotes[idx].done;
+  const td=_todayKey();
+  fbDb.ref('state/dailyNotes/'+idx).update({
+    done:isDone,
+    doneDate:isDone?td:null
+  }).then(()=>{
+    logger('Note #'+noteId+' toggled '+(isDone?'done':'undone'));
+  });
+}
 
 // ═══════════════════════════════════════
 // INIT
