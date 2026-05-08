@@ -1103,7 +1103,7 @@ function renderAgentCard(data){
       detailHtml+=`</div>`;
     }
     return `<div>
-      <div style="display:flex;align-items:center;gap:8px;padding:8px 0;cursor:pointer;${isExpanded?'':'border-bottom:1px solid var(--border)'}" onclick="toggleAgentDetail('${name}')">
+      <div class="agent-row" data-agent="${name}" style="display:flex;align-items:center;gap:8px;padding:8px 0;cursor:pointer;${isExpanded?'':'border-bottom:1px solid var(--border)'}">
         <span style="font-size:16px">${icons[name]}</span>
         <div style="flex:1">
           <div style="display:flex;align-items:center;gap:6px"><strong>${labels[name]}</strong><span style="font-size:10px">${dot}</span><span style="font-size:11px;color:var(--text2)">${statusText}</span></div>
@@ -1122,6 +1122,15 @@ function toggleAgentDetail(name){
   _expandedAgent=_expandedAgent===name?null:name;
   if(_agentData)renderAgentCard(_agentData);
 }
+
+// Event delegation for agent clicks
+document.getElementById('agentList').addEventListener('click',function(e){
+  const row=e.target.closest('.agent-row');
+  if(row){
+    const name=row.getAttribute('data-agent');
+    if(name)toggleAgentDetail(name);
+  }
+});
 
 // ═══════════════════════════════════════
 // MONSTEA DAILY CARD + NOTES
