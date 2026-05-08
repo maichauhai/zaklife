@@ -1399,6 +1399,9 @@ function initTradingListeners(){
   _tbListenersInit=true;
   fbDb.ref('trading_bot/status').on('value',snap=>{
     const s=snap.val();if(!s)return;
+    // MT5 disconnect warning
+    const hbDot=document.getElementById('tbHbDot');
+    if(s.mt5_connected===false){hbDot.style.background='var(--red)';document.getElementById('tbHbTime').textContent='⚠️ MT5 OFFLINE';}
     if(s.account){
       document.getElementById('tbBalance').textContent='$'+(s.account.balance?.toFixed(0)||'--');
       document.getElementById('tbEquity').textContent='$'+(s.account.equity?.toFixed(0)||'--');
