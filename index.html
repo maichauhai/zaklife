@@ -22,7 +22,7 @@
   <button class="nav-item" onclick="switchTab('journal')"><span>📝</span><span>Journal</span></button>
   <button class="nav-item" onclick="switchTab('ideas')"><span>💡</span><span>Ideas</span></button>
   <button class="nav-item" onclick="switchTab('habits')"><span>📅</span><span>Calendar</span></button>
-  <button class="nav-item" onclick="switchTab('history')"><span>📚</span><span>History</span></button>
+  <button class="nav-item" onclick="openTrading()"><span>📈</span><span>Trading</span></button>
   <button class="nav-item" onclick="switchTab('settings')"><span>⚙️</span><span>Settings</span></button>
   <button class="nav-item" onclick="openVault()"><span>🔐</span><span>Vault</span></button>
 </nav>
@@ -257,6 +257,59 @@
     <button class="btn btn-outline btn-sm" onclick="exportIdeasToObs()" style="font-size:0.72rem">📤 Export Obsidian</button>
   </div>
   <div id="ideasList"></div>
+</div>
+
+<!-- ═══ TRADING ═══ -->
+<div class="section" id="sec-trading">
+  <div id="trading-lock" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:16px">
+    <div style="font-size:48px">📈</div>
+    <div style="font-size:1.1rem;font-weight:700">Trading Bot Dashboard</div>
+    <div style="font-size:0.82rem;color:var(--text2)">Nhập mật khẩu</div>
+    <div style="display:flex;gap:8px;width:100%;max-width:260px">
+      <input type="password" id="tradingPwd" placeholder="Password..." style="flex:1;padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text1);font-size:1rem;letter-spacing:3px" onkeydown="if(event.key==='Enter')unlockTrading()">
+      <button onclick="unlockTrading()" style="padding:10px 16px;border-radius:12px;background:var(--accent);color:#fff;border:none;cursor:pointer">→</button>
+    </div>
+    <div id="trading-lock-err" style="color:#f87171;font-size:0.78rem;display:none">❌ Sai mật khẩu</div>
+  </div>
+  <div id="trading-content" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-size:1.05rem;font-weight:700">📈 Trading Bot</div>
+      <div style="display:flex;align-items:center;gap:6px"><span id="tbHbDot" style="width:8px;height:8px;border-radius:50%;background:var(--green)"></span><span id="tbHbTime" style="font-size:0.7rem;color:var(--text2)">--:--</span></div>
+    </div>
+    <div class="stat-row">
+      <div class="stat-box"><div class="stat-value" id="tbBalance">--</div><div class="stat-label">Balance</div></div>
+      <div class="stat-box"><div class="stat-value" id="tbEquity">--</div><div class="stat-label">Equity</div></div>
+      <div class="stat-box"><div class="stat-value" id="tbPnl" style="color:var(--green)">--</div><div class="stat-label">Daily PnL</div></div>
+    </div>
+    <!-- Sub tabs -->
+    <div style="display:flex;gap:6px;margin-bottom:10px;overflow-x:auto" id="tbNav">
+      <button class="vtab active" onclick="tbShowPanel('pos')">Positions</button>
+      <button class="vtab" onclick="tbShowPanel('orders')">Orders</button>
+      <button class="vtab" onclick="tbShowPanel('strat')">Strategy</button>
+      <button class="vtab" onclick="tbShowPanel('ctrl')">Controls</button>
+      <button class="vtab" onclick="tbShowPanel('log')">Log</button>
+    </div>
+    <!-- Positions -->
+    <div id="tb-pos"><div class="card"><div class="card-title">📋 Positions <span id="tbPosCount">(0)</span></div><div id="tbPosList"></div></div>
+    <button class="btn btn-outline btn-sm" onclick="tbCloseAll()" style="width:100%;color:var(--red);border-color:rgba(248,113,113,0.3)">🚨 Close All</button></div>
+    <!-- Orders config -->
+    <div id="tb-orders" style="display:none"><div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="card-title" style="margin:0">⚙️ Order Slots</div><button class="btn btn-outline btn-sm" onclick="tbAddOrder()">+ Thêm</button></div><div id="tbOrderSlots"></div></div>
+    <button class="btn btn-primary" onclick="tbSaveConfig()" style="width:100%">💾 Lưu Config</button></div>
+    <!-- Strategy -->
+    <div id="tb-strat" style="display:none"><div class="card"><div class="card-title">🛡️ Strategy</div>
+    <div class="range-row"><label>SL Distance</label><input type="range" min="3" max="15" step="0.5" id="tbSL" oninput="this.nextElementSibling.textContent=this.value+'g'"><span class="val">6g</span></div>
+    <div class="range-row"><label>Max Orders</label><input type="range" min="1" max="6" step="1" id="tbMaxOrd" oninput="this.nextElementSibling.textContent=this.value"><span class="val">2</span></div>
+    <div class="range-row"><label>Cooldown</label><input type="range" min="5" max="120" step="5" id="tbCool" oninput="this.nextElementSibling.textContent=this.value+'m'"><span class="val">30m</span></div>
+    <div class="range-row"><label>Daily Loss</label><input type="range" min="20" max="500" step="10" id="tbLoss" oninput="this.nextElementSibling.textContent='$'+this.value"><span class="val">$100</span></div>
+    </div><button class="btn btn-primary" onclick="tbSaveConfig()" style="width:100%">💾 Lưu Config</button></div>
+    <!-- Controls -->
+    <div id="tb-ctrl" style="display:none"><div class="card"><div class="card-title">🎮 Controls</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0"><span>Bot Active</span><button class="toggle" id="tbToggle" onclick="tbToggleBot()"></button></div>
+    </div><div class="card"><button class="btn btn-outline btn-sm" onclick="tbCloseAll()" style="width:100%;color:var(--red);border-color:rgba(248,113,113,0.3);margin-bottom:8px">🚨 Close All</button>
+    <button class="btn btn-outline btn-sm" onclick="tbResetCircuit()" style="width:100%;color:var(--yellow);border-color:rgba(251,191,36,0.3)">🔄 Reset Circuit Breaker</button></div></div>
+    <!-- Log -->
+    <div id="tb-log" style="display:none"><div class="card"><div class="card-title">📜 Signal Log</div><div id="tbSignalLog"></div></div></div>
+  </div>
 </div>
 
 </div>
@@ -1310,12 +1363,159 @@ function exportIdeasToObs(){
   saveState();renderIdeas();
   showToast(`📤 Exported ${unsynced.length} ý tưởng!`);
 }
+
+// ═══════════════════════════════════════
+// TRADING TAB
+// ═══════════════════════════════════════
+let tradingUnlocked=false;
+let tbOrders=[];
+
+function openTrading(){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('sec-trading').classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>{if(n.textContent.includes('Trading'))n.classList.add('active')});
+  if(!tradingUnlocked){document.getElementById('trading-lock').style.display='flex';document.getElementById('trading-content').style.display='none';setTimeout(()=>document.getElementById('tradingPwd')?.focus(),100);}
+  else{document.getElementById('trading-lock').style.display='none';document.getElementById('trading-content').style.display='block';}
+}
+
+function unlockTrading(){
+  if(document.getElementById('tradingPwd').value===VAULT_PWD){
+    tradingUnlocked=true;
+    document.getElementById('trading-lock-err').style.display='none';
+    document.getElementById('tradingPwd').value='';
+    document.getElementById('trading-lock').style.display='none';
+    document.getElementById('trading-content').style.display='block';
+    initTradingListeners();
+  } else {
+    document.getElementById('trading-lock-err').style.display='block';
+    document.getElementById('tradingPwd').value='';
+  }
+}
+
+let _tbListenersInit=false;
+function initTradingListeners(){
+  if(_tbListenersInit||!fbDb)return;
+  _tbListenersInit=true;
+  fbDb.ref('trading_bot/status').on('value',snap=>{
+    const s=snap.val();if(!s)return;
+    if(s.account){
+      document.getElementById('tbBalance').textContent='$'+(s.account.balance?.toFixed(0)||'--');
+      document.getElementById('tbEquity').textContent='$'+(s.account.equity?.toFixed(0)||'--');
+    }
+    if(s.daily_pnl!==undefined){
+      const el=document.getElementById('tbPnl');
+      el.textContent=(s.daily_pnl>=0?'+':'')+s.daily_pnl.toFixed(2)+'$';
+      el.style.color=s.daily_pnl>=0?'var(--green)':'var(--red)';
+    }
+    if(s.heartbeat){
+      const t=new Date(s.heartbeat);
+      document.getElementById('tbHbTime').textContent=t.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});
+      const age=(Date.now()-t.getTime())/1000;
+      document.getElementById('tbHbDot').style.background=age<120?'var(--green)':age<600?'var(--yellow)':'var(--red)';
+    }
+    tbRenderPositions(s.positions||[]);
+    const tb=document.getElementById('tbToggle');
+    if(s.bot_active!==undefined)tb.classList.toggle('on',s.bot_active);
+  });
+  fbDb.ref('trading_bot/config').on('value',snap=>{
+    const c=snap.val();if(!c)return;
+    tbLoadConfig(c);
+  });
+  fbDb.ref('trading_bot/signal_log').limitToLast(20).on('value',snap=>{
+    tbRenderLog(snap.val());
+  });
+}
+
+function tbShowPanel(name){
+  ['pos','orders','strat','ctrl','log'].forEach(p=>{const el=document.getElementById('tb-'+p);if(el)el.style.display=p===name?'block':'none';});
+  document.querySelectorAll('#tbNav .vtab').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+function tbRenderPositions(positions){
+  const arr=Array.isArray(positions)?positions:Object.values(positions||{});
+  document.getElementById('tbPosCount').textContent='('+arr.length+')';
+  const el=document.getElementById('tbPosList');
+  if(!arr.length){el.innerHTML='<div style="text-align:center;padding:16px;color:var(--text2);font-size:0.82rem">Kh\u00f4ng c\u00f3 l\u1ec7nh m\u1edf</div>';return;}
+  el.innerHTML=arr.map(p=>{
+    const dir=p.direction||((p.type===0)?'BUY':'SELL');
+    const dc=dir==='BUY'?'var(--green)':'var(--red)';
+    const pc=p.profit>=0?'var(--green)':'var(--red)';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:0.82rem">'+
+      '<div><span style="display:inline-block;padding:2px 6px;border-radius:4px;font-size:0.7rem;font-weight:700;background:'+dc+';color:#111">'+dir+'</span> <b>'+(p.volume||p.lot)+'</b>lot @'+(p.price_open||p.entry)+
+      '<div style="font-size:0.7rem;color:var(--text2)">SL:'+p.sl+' TP:'+p.tp+' #'+p.ticket+'</div></div>'+
+      '<div style="text-align:right"><div style="color:'+pc+';font-weight:700">'+(p.profit>=0?'+':'')+p.profit?.toFixed(2)+'$</div>'+
+      '<button onclick="tbCloseTicket('+p.ticket+')" style="font-size:0.65rem;padding:2px 6px;border-radius:6px;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.3);color:var(--red);cursor:pointer;margin-top:2px">Close</button></div></div>';
+  }).join('');
+}
+
+function tbLoadConfig(c){
+  const s=(id,v)=>{const el=document.getElementById(id);if(!el)return;el.value=v;const sp=el.nextElementSibling;if(sp){if(id==='tbSL')sp.textContent=v+'g';else if(id==='tbCool')sp.textContent=v+'m';else if(id==='tbLoss')sp.textContent='$'+v;else sp.textContent=v;}};
+  s('tbSL',c.sl_distance||6);s('tbMaxOrd',c.max_open_orders||2);s('tbCool',c.signal_cooldown_min||30);s('tbLoss',c.daily_loss_limit_usd||100);
+  const orders=c.orders||[{role:'scalp',lot:0.04,tp_distance:5,entry_offset:0,protect_trigger:3.5,protect_sl_offset:1,trailing:[]},{role:'runner',lot:0.02,tp_distance:10,entry_offset:1,protect_trigger:3.5,protect_sl_offset:5,trailing:[{trigger:5,offset:1},{trigger:8,offset:5}]}];
+  tbOrders=JSON.parse(JSON.stringify(orders));
+  tbRenderOrders();
+}
+
+function tbRenderOrders(){
+  document.getElementById('tbOrderSlots').innerHTML=tbOrders.map((o,i)=>{
+    const trails=(o.trailing||[]).map((t,ti)=>'<div style="display:flex;gap:4px;align-items:center;margin-bottom:4px;font-size:0.75rem"><span>B\u1eadc '+(ti+1)+':</span> +<input type="number" value="'+t.trigger+'" step="0.5" style="width:50px;padding:3px 4px;font-size:0.75rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text1)" onchange="tbOrders['+i+'].trailing['+ti+'].trigger=+this.value">g \u2192 BE+<input type="number" value="'+t.offset+'" step="0.5" style="width:50px;padding:3px 4px;font-size:0.75rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text1)" onchange="tbOrders['+i+'].trailing['+ti+'].offset=+this.value">g <button onclick="tbOrders['+i+'].trailing.splice('+ti+',1);tbRenderOrders()" style="background:none;border:none;color:var(--red);cursor:pointer">&times;</button></div>').join('');
+    return '<div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;background:rgba(129,140,248,0.04)">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><input type="text" value="'+o.role+'" style="width:70px;font-weight:700;font-size:0.82rem;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text1)" onchange="tbOrders['+i+'].role=this.value"><button onclick="tbRemoveOrder('+i+')" style="background:none;border:none;color:var(--red);cursor:pointer">\ud83d\uddd1\ufe0f</button></div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;font-size:0.78rem"><div>Lot <input type="number" value="'+o.lot+'" step="0.01" min="0.01" style="width:55px;padding:3px;font-size:0.78rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text1)" onchange="tbOrders['+i+'].lot=+this.value"></div>'+
+      '<div>TP <input type="number" value="'+o.tp_distance+'" step="0.5" style="width:50px;padding:3px;font-size:0.78rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text1)" onchange="tbOrders['+i+'].tp_distance=+this.value">g</div>'+
+      '<div>Offset <input type="number" value="'+(o.entry_offset||0)+'" step="0.5" min="0" style="width:50px;padding:3px;font-size:0.78rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text1)" onchange="tbOrders['+i+'].entry_offset=+this.value">g</div></div>'+
+      '<div style="font-size:0.72rem;color:var(--text2);margin:4px 0">\ud83d\udee1\ufe0f Protect: +<input type="number" value="'+(o.protect_trigger||0)+'" step="0.5" style="width:45px;padding:2px;font-size:0.72rem;border-radius:4px;border:1px solid var(--border);background:var(--bg);color:var(--text1)" onchange="tbOrders['+i+'].protect_trigger=+this.value">g \u2192 SL offset <input type="number" value="'+(o.protect_sl_offset||1)+'" step="0.5" style="width:45px;padding:2px;font-size:0.72rem;border-radius:4px;border:1px solid var(--border);background:var(--bg);color:var(--text1)" onchange="tbOrders['+i+'].protect_sl_offset=+this.value">g</div>'+
+      '<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--text2);margin-bottom:4px"><span>\ud83d\udd12 Trailing</span><button onclick="tbOrders['+i+'].trailing.push({trigger:5,offset:1});tbRenderOrders()" style="font-size:0.65rem;padding:1px 6px;border-radius:4px;background:var(--card);border:1px solid var(--border);color:var(--text2);cursor:pointer">+</button></div>'+trails+'</div></div>';
+  }).join('');
+}
+
+function tbAddOrder(){tbOrders.push({role:'order'+(tbOrders.length+1),lot:0.01,tp_distance:5,entry_offset:tbOrders.length,protect_trigger:3.5,protect_sl_offset:1,trailing:[]});tbRenderOrders();}
+function tbRemoveOrder(i){if(tbOrders.length<=1){showToast('Ph\u1ea3i c\u00f3 \u00edt nh\u1ea5t 1 l\u1ec7nh');return;}tbOrders.splice(i,1);tbRenderOrders();}
+
+function tbSaveConfig(){
+  if(!fbDb)return;
+  fbDb.ref('trading_bot/config').set({
+    sl_distance:+document.getElementById('tbSL').value,
+    max_open_orders:+document.getElementById('tbMaxOrd').value,
+    signal_cooldown_min:+document.getElementById('tbCool').value,
+    daily_loss_limit_usd:+document.getElementById('tbLoss').value,
+    orders:tbOrders,
+    bot_active:document.getElementById('tbToggle').classList.contains('on'),
+    updated_at:new Date().toISOString()
+  }).then(()=>showToast('\u2705 Config \u0111\u00e3 l\u01b0u!')).catch(e=>showToast('\u274c L\u1ed7i: '+e));
+}
+
+function tbCloseAll(){if(!confirm('\ud83d\udea8 \u0110\u00d3NG T\u1ea4T C\u1ea2?'))return;fbDb.ref('trading_bot/commands/close_all').set(true);showToast('\ud83d\udea8 \u0110\u00e3 g\u1eedi Close All');}
+function tbCloseTicket(t){if(!confirm('\u0110\u00f3ng #'+t+'?'))return;fbDb.ref('trading_bot/commands/close_ticket').set(t);showToast('\u0110\u00e3 g\u1eedi \u0111\u00f3ng #'+t);}
+function tbToggleBot(){const tb=document.getElementById('tbToggle');const n=!tb.classList.contains('on');tb.classList.toggle('on',n);fbDb.ref('trading_bot/config/bot_active').set(n);showToast(n?'\ud83d\udfe2 Bot ON':'\ud83d\udd34 Bot OFF');}
+function tbResetCircuit(){fbDb.ref('trading_bot/commands/reset_circuit').set(true);showToast('\ud83d\udd04 Reset circuit breaker');}
+
+function tbRenderLog(data){
+  const el=document.getElementById('tbSignalLog');if(!el)return;
+  if(!data){el.innerHTML='<div style="text-align:center;padding:16px;color:var(--text2);font-size:0.82rem">Ch\u01b0a c\u00f3 signal</div>';return;}
+  el.innerHTML=Object.values(data).reverse().slice(0,20).map(s=>{
+    const dc=s.direction==='BUY'?'var(--green)':'var(--red)';
+    const t=s.timestamp?new Date(s.timestamp).toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+    return '<div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:0.8rem"><span style="display:inline-block;padding:1px 5px;border-radius:4px;font-size:0.68rem;font-weight:700;background:'+dc+';color:#111">'+(s.direction||'?')+'</span> '+
+      (s.entry_low||'?')+'-'+(s.entry_high||'?')+' '+(s.result||'')+' <span style="float:right;color:var(--text2);font-size:0.68rem">'+t+'</span></div>';
+  }).join('');
+}
 </script>
 <style>
 .vtab{padding:7px 14px;border-radius:10px;background:var(--card);border:1px solid var(--border);color:var(--text2);cursor:pointer;font-size:0.78rem;font-weight:600;transition:all .2s}
 .vtab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 #ideaPasteZone:empty:before{content:attr(data-placeholder);color:var(--text2);pointer-events:none}
 #ideaPasteZone:focus{border-color:var(--accent)}
+.range-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.range-row label{font-size:0.78rem;color:var(--text2);min-width:80px}
+.range-row input[type=range]{flex:1;accent-color:var(--accent)}
+.range-row .val{font-size:0.82rem;font-weight:600;min-width:40px;text-align:right}
+.toggle{width:44px;height:24px;border-radius:12px;background:var(--border);position:relative;cursor:pointer;transition:.3s;border:none}
+.toggle.on{background:var(--green)}
+.toggle::after{content:'';position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:3px;left:3px;transition:.3s}
+.toggle.on::after{left:23px}
 </style>
 </body>
 </html>
