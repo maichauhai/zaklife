@@ -1038,7 +1038,11 @@ function logger(msg){console.log('[ZakLife]',msg)}
 // ═══════════════════════════════════════
 // AGENT STATUS CARD
 // ═══════════════════════════════════════
+let _agentData=null;
+let _expandedAgent=null;
+
 function renderAgentCard(data){
+  _agentData=data;
   const el=document.getElementById('agentList');
   if(!data){el.innerHTML='<div style="text-align:center;padding:8px;opacity:0.5">Chưa có dữ liệu agent</div>';return;}
   const agents=['kyoko','nana','longnhi'];
@@ -1054,15 +1058,69 @@ function renderAgentCard(data){
     if(mins>60){dot='🔴';statusText=mins>1440?Math.floor(mins/1440)+'d trước':Math.floor(mins/60)+'h trước';}
     else if(mins>10){dot='🟡';statusText=mins+'m trước';}
     else{statusText='vừa xong';}
-    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:16px">${icons[name]}</span>
-      <div style="flex:1">
-        <div style="display:flex;align-items:center;gap:6px"><strong>${labels[name]}</strong><span style="font-size:10px">${dot}</span><span style="font-size:11px;color:var(--text2)">${statusText}</span></div>
-        ${a.lastTask?`<div style="font-size:11px;color:var(--text2);margin-top:2px">└ ${a.lastTask}</div>`:''}
+    const isExpanded=_expandedAgent===name;
+    const d=a.details||{};
+    // Detail panel HTML
+    let detailHtml='';
+    if(isExpanded&&d){
+      // Platform
+      detailHtml+=`<div style="padding:10px 0 6px 28px;font-size:11px;border-top:1px solid var(--border);margin-top:6px">`;
+      detailHtml+=`<div style="color:var(--text2);margin-bottom:8px">📍 ${d.platform||'N/A'}${d.uptime?' · ⏱️ Uptime: '+d.uptime:''}</div>`;
+      // Cron jobs
+      const crons=d.crons||[];
+      if(crons.length){
+        detailHtml+=`<div style="font-weight:600;margin-bottom:4px">⏰ Cron Jobs (${crons.length})</div>`;
+        crons.forEach(c=>{
+          detailHtml+=`<div style="display:flex;gap:8px;padding:3px 0;align-items:baseline">
+            <code style="font-size:10px;background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:4px;color:var(--accent);white-space:nowrap">${c.schedule}</code>
+            <div><strong style="font-size:11px">${c.job}</strong><div style="font-size:10px;color:var(--text2)">${c.desc||''}</div></div>
+          </div>`;
+        });
+      }
+      // Recent tasks
+      const tasks=d.recentTasks||[];
+      if(tasks.length){
+        detailHtml+=`<div style="font-weight:600;margin:8px 0 4px">📋 Gần đây</div>`;
+        tasks.forEach(t=>{
+          const sIcon=t.status==='done'?'✅':t.status==='running'?'🔄':'⏳';
+          detailHtml+=`<div style="display:flex;gap:6px;padding:2px 0;align-items:center">
+            <span style="font-size:11px">${sIcon}</span>
+            <span style="flex:1;font-size:11px">${t.task}</span>
+            <span style="font-size:10px;color:var(--text2)">${t.time||''}</span>
+          </div>`;
+        });
+      }
+      // Skills
+      const skills=d.skills||[];
+      if(skills.length){
+        detailHtml+=`<div style="font-weight:600;margin:8px 0 4px">🧠 Skills (${skills.length})</div>`;
+        detailHtml+=`<div style="display:flex;flex-wrap:wrap;gap:4px">`;
+        skills.forEach(s=>{
+          detailHtml+=`<span style="font-size:10px;background:rgba(96,165,250,0.1);color:var(--accent);padding:2px 6px;border-radius:6px">${s}</span>`;
+        });
+        detailHtml+=`</div>`;
+      }
+      detailHtml+=`</div>`;
+    }
+    return `<div>
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 0;cursor:pointer;${isExpanded?'':'border-bottom:1px solid var(--border)'}" onclick="toggleAgentDetail('${name}')">
+        <span style="font-size:16px">${icons[name]}</span>
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:6px"><strong>${labels[name]}</strong><span style="font-size:10px">${dot}</span><span style="font-size:11px;color:var(--text2)">${statusText}</span></div>
+          ${a.lastTask?`<div style="font-size:11px;color:var(--text2);margin-top:2px">└ ${a.lastTask}</div>`:''}
+        </div>
+        ${a.taskCount?`<span style="font-size:11px;background:rgba(96,165,250,0.15);color:var(--accent);padding:2px 6px;border-radius:8px">${a.taskCount} tasks</span>`:''}
+        <span style="font-size:10px;color:var(--text2);transition:transform 0.2s;${isExpanded?'transform:rotate(180deg)':''}">▼</span>
       </div>
-      ${a.taskCount?`<span style="font-size:11px;background:rgba(96,165,250,0.15);color:var(--accent);padding:2px 6px;border-radius:8px">${a.taskCount} tasks</span>`:''}
+      ${detailHtml}
+      ${isExpanded?'<div style="border-bottom:1px solid var(--border)"></div>':''}
     </div>`;
   }).join('');
+}
+
+function toggleAgentDetail(name){
+  _expandedAgent=_expandedAgent===name?null:name;
+  if(_agentData)renderAgentCard(_agentData);
 }
 
 // ═══════════════════════════════════════
