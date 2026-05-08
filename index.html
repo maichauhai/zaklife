@@ -982,9 +982,12 @@ function initFirebase(){
         restoreVaultFromFirebase();
       }
     });
-    // Listen for AI agent status
+    // Listen for AI agent status (debounced to avoid overriding click expand)
+    let _agentRenderTimer=null;
     fbDb.ref('zaklife/agents').on('value',snap=>{
-      renderAgentCard(snap.val());
+      const data=snap.val();
+      if(_agentRenderTimer)clearTimeout(_agentRenderTimer);
+      _agentRenderTimer=setTimeout(()=>renderAgentCard(data),200);
     });
     // Listen for Monstea data (invoices + notes)
     fbDb.ref('state/todayInvoices').on('value',snap=>{
