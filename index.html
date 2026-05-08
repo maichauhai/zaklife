@@ -983,11 +983,10 @@ function initFirebase(){
       }
     });
     // Listen for AI agent status (debounced to avoid overriding click expand)
-    let _agentRenderTimer=null;
     fbDb.ref('zaklife/agents').on('value',snap=>{
       const data=snap.val();
       if(_agentRenderTimer)clearTimeout(_agentRenderTimer);
-      _agentRenderTimer=setTimeout(()=>renderAgentCard(data),200);
+      _agentRenderTimer=setTimeout(()=>renderAgentCard(data),300);
     });
     // Listen for Monstea data (invoices + notes)
     fbDb.ref('state/todayInvoices').on('value',snap=>{
@@ -1043,6 +1042,7 @@ function logger(msg){console.log('[ZakLife]',msg)}
 // ═══════════════════════════════════════
 let _agentData=null;
 let _expandedAgent=null;
+let _agentRenderTimer=null;
 
 function renderAgentCard(data){
   _agentData=data;
@@ -1070,7 +1070,7 @@ function renderAgentCard(data){
       detailHtml+=`<div style="padding:10px 0 6px 28px;font-size:11px;border-top:1px solid var(--border);margin-top:6px">`;
       detailHtml+=`<div style="color:var(--text2);margin-bottom:8px">📍 ${d.platform||'N/A'}${d.uptime?' · ⏱️ Uptime: '+d.uptime:''}</div>`;
       // Cron jobs
-      const crons=d.crons||[];
+      const crons=Array.isArray(d.crons)?d.crons:[];
       if(crons.length){
         detailHtml+=`<div style="font-weight:600;margin-bottom:4px">⏰ Cron Jobs (${crons.length})</div>`;
         crons.forEach(c=>{
@@ -1081,7 +1081,7 @@ function renderAgentCard(data){
         });
       }
       // Recent tasks
-      const tasks=d.recentTasks||[];
+      const tasks=Array.isArray(d.recentTasks)?d.recentTasks:[];
       if(tasks.length){
         detailHtml+=`<div style="font-weight:600;margin:8px 0 4px">📋 Gần đây</div>`;
         tasks.forEach(t=>{
@@ -1094,7 +1094,7 @@ function renderAgentCard(data){
         });
       }
       // Skills
-      const skills=d.skills||[];
+      const skills=Array.isArray(d.skills)?d.skills:[];
       if(skills.length){
         detailHtml+=`<div style="font-weight:600;margin:8px 0 4px">🧠 Skills (${skills.length})</div>`;
         detailHtml+=`<div style="display:flex;flex-wrap:wrap;gap:4px">`;
@@ -1123,6 +1123,8 @@ function renderAgentCard(data){
 
 function toggleAgentDetail(name){
   _expandedAgent=_expandedAgent===name?null:name;
+  // Cancel any pending Firebase re-render
+  if(_agentRenderTimer){clearTimeout(_agentRenderTimer);_agentRenderTimer=null;}
   if(_agentData)renderAgentCard(_agentData);
 }
 
