@@ -465,6 +465,15 @@ function isDueLaundry(dateStr,habit){
   return(cur-last)/(86400000)>=habit.cycle;
 }
 
+function toggleDashHabit(id){
+  const d=today();
+  if(!state.habitLog[d])state.habitLog[d]={};
+  if(state.habitLog[d][id]){delete state.habitLog[d][id];}
+  else{state.habitLog[d][id]=true;}
+  saveState();
+  renderDashboard();
+}
+
 // ─── NGÀY LỄ VIỆT NAM ───
 // Dương lịch cố định: key = "MM-DD"
 const VN_FIXED_HOLIDAYS = {
@@ -707,8 +716,25 @@ function renderDashboard(){
     return isDueLaundry(dh,h)||log[h.id];
   });
   const done=todayHabits.filter(h=>log[h.id]).length;
-  document.getElementById('dashHabits').innerHTML=`<div style="font-size:13px;color:var(--text2);margin-bottom:8px">${done}/${todayHabits.length} hoàn thành</div>`+
-    todayHabits.map(h=>`<span style="font-size:20px;margin-right:4px;opacity:${log[h.id]?1:0.3}">${h.icon}</span>`).join('');
+  const habitRows=todayHabits.map(h=>{
+    const checked=!!log[h.id];
+    const isDue=h.cycle?isDueLaundry(dh,h):!checked;
+    // Days since last done
+    const lastDone=Object.keys(state.habitLog).filter(d=>state.habitLog[d][h.id]).sort().reverse()[0];
+    const daysSince=lastDone?Math.floor((new Date(dh)-new Date(lastDone))/86400000):null;
+    let badge='';
+    if(!checked&&h.cycle&&daysSince!==null&&daysSince>=h.cycle){
+      badge=`<span style="font-size:10px;color:var(--yellow)">⚠️ ${daysSince}d</span>`;
+    }else if(checked){
+      badge=`<span style="font-size:10px;color:var(--green)">✓</span>`;
+    }
+    return `<div onclick="toggleDashHabit(${h.id})" style="display:inline-flex;align-items:center;gap:3px;padding:4px 8px;border-radius:10px;cursor:pointer;margin:2px;background:${checked?'rgba(74,222,128,0.15)':'rgba(255,255,255,0.04)'};border:1px solid ${checked?'rgba(74,222,128,0.3)':isDue?'rgba(250,204,21,0.3)':'var(--border)'};transition:all 0.2s">
+      <span style="font-size:16px;${checked?'':'opacity:0.5'}">${h.icon}</span>
+      <span style="font-size:11px;${checked?'text-decoration:line-through;color:var(--text2)':'color:var(--text1)'}">${h.name}</span>
+      ${badge}
+    </div>`;
+  }).join('');
+  document.getElementById('dashHabits').innerHTML=`<div style="font-size:13px;color:var(--text2);margin-bottom:6px">${done}/${todayHabits.length} hoàn thành</div><div style="display:flex;flex-wrap:wrap;gap:0">${habitRows}</div>`;
 
   // Weekly Review + Nana Insights
   renderWeeklyReview();
