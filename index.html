@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="style.css">
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 </head>
 <body>
 
@@ -25,6 +26,7 @@
   <button class="nav-item" onclick="openTrading()"><span>📈</span><span>Trading</span></button>
   <button class="nav-item" onclick="switchTab('settings')"><span>⚙️</span><span>Settings</span></button>
   <button class="nav-item" onclick="switchTab('content')"><span>📣</span><span>Content</span></button>
+  <button class="nav-item" onclick="switchTab('media')"><span>🖼️</span><span>Media</span></button>
   <button class="nav-item" onclick="openVault()"><span>🔐</span><span>Vault</span></button>
 </nav>
 
@@ -212,11 +214,13 @@
     <div style="display:grid;gap:10px">
       <input class="gratitude-input" id="contentId" placeholder="ID bài viết">
       <textarea class="journal-entry" id="contentMessage" placeholder="Nội dung bài đăng Facebook..." style="min-height:150px"></textarea>
-      <input class="gratitude-input" id="contentPhoto" placeholder="Ảnh: C:/Users/pc/Desktop/Monstea/n8n/media/anh.jpg hoặc URL ảnh">
+      <input class="gratitude-input" id="contentPhoto" placeholder="URL ảnh từ Media hoặc link ảnh public">
+      <input type="hidden" id="contentStoragePath">
       <input class="gratitude-input" id="contentLink" placeholder="Link đính kèm (tuỳ chọn)">
       <input class="gratitude-input" id="contentTime" placeholder="Giờ đăng: 2026-05-21T18:30:00+07:00">
       <input class="gratitude-input" id="contentWebhook" placeholder="Webhook n8n đăng ngay (mặc định http://localhost:5678/webhook/monstea-post-now)">
       <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="switchTab('media')">🖼️ Chọn từ Media</button>
         <button class="btn btn-outline btn-sm" onclick="saveContentPost('draft')">💾 Lưu nháp</button>
         <button class="btn btn-outline btn-sm" onclick="saveContentPost('approved')" style="color:var(--green);border-color:rgba(52,211,153,0.35)">✅ Duyệt & hẹn giờ</button>
         <button class="btn btn-outline btn-sm" onclick="postNowContentPost()" style="color:var(--yellow);border-color:rgba(251,191,36,0.35)">⚡ Đăng ngay</button>
@@ -238,6 +242,34 @@
   <div class="card">
     <div class="card-title">📜 Log trạng thái</div>
     <div id="contentLog" style="font-size:12px;color:var(--text2)">Đang tải...</div>
+  </div>
+</div>
+
+<!-- ═══ MEDIA ═══ -->
+<div class="section" id="sec-media">
+  <div class="stat-row">
+    <div class="stat-box"><div class="stat-value" id="mediaTotal">0</div><div class="stat-label">Ảnh</div></div>
+    <div class="stat-box"><div class="stat-value" id="mediaUsed">0</div><div class="stat-label">Đang dùng</div></div>
+    <div class="stat-box"><div class="stat-value" id="mediaUnused">0</div><div class="stat-label">Có thể xóa</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🖼️ Media Monstea</div>
+    <div class="card-subtitle">Upload ảnh lên Firebase Storage. Content sẽ dùng URL public, còn Storage path dùng để xóa đúng file khi không cần nữa.</div>
+    <div style="display:grid;gap:10px">
+      <input class="gratitude-input" id="mediaTitle" placeholder="Tên ảnh / ghi chú ngắn">
+      <input class="gratitude-input" id="mediaFile" type="file" accept="image/*">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="uploadMedia()">⬆️ Upload ảnh</button>
+        <button class="btn btn-outline btn-sm" onclick="renderMedia()">↻ Làm mới</button>
+      </div>
+      <div id="mediaUploadStatus" style="font-size:12px;color:var(--text2)">Chưa upload ảnh.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📁 Thư viện ảnh</div>
+    <div id="mediaList" class="media-grid"></div>
   </div>
 </div>
 
@@ -448,6 +480,7 @@ function switchTab(tab){
   if(tab==='history')renderHistory();
   if(tab==='settings')renderSettings();
   if(tab==='content')renderContent();
+  if(tab==='media')renderMedia();
   if(tab==='vault'){}  // vault handled separately
 }
 function openVault(){
@@ -1029,12 +1062,13 @@ const FB_CONFIG={
   messagingSenderId:"742890598182",
   appId:"1:742890598182:web:ce67a7db065fe94b845be7"
 };
-let fbDb=null;
+let fbDb=null,fbStorage=null;
 
 function initFirebase(){
   try{
     firebase.initializeApp(FB_CONFIG);
     fbDb=firebase.database();
+    fbStorage=firebase.storage();
     logger('Firebase connected');
     // Listen for Nana messages
     fbDb.ref('zaklife/nana_messages').on('value',snap=>{
@@ -1089,6 +1123,10 @@ function initFirebase(){
     fbDb.ref('zaklife/content-log').limitToLast(20).on('value',snap=>{
       _contentLog=snap.val()||{};
       renderContentLog();
+    });
+    fbDb.ref('zaklife/media').on('value',snap=>{
+      _mediaItems=snap.val()||{};
+      renderMedia();
     });
   }catch(e){logger('Firebase error: '+e)}
 }
@@ -1282,7 +1320,7 @@ function toggleMonsteaNote(noteId){
 // ═══════════════════════════════════════
 // CONTENT MARKETING
 // ═══════════════════════════════════════
-let _contentPosts={},_contentLog={},_selectedContentId=null;
+let _contentPosts={},_contentLog={},_mediaItems={},_selectedContentId=null;
 
 function contentArray(){
   return Object.values(_contentPosts||{}).filter(Boolean).sort((a,b)=>{
@@ -1298,6 +1336,14 @@ function contentStatusClass(s){return ['approved','posted','failed'].includes(s)
 function contentNowIso(){
   const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
   return d.toISOString().slice(0,19)+'+07:00';
+}
+function contentMediaUsage(){
+  const used={};
+  Object.values(_contentPosts||{}).filter(Boolean).forEach(p=>{
+    const key=p.storage_path||p.image_url||p.photo_path;
+    if(key)used[key]=(used[key]||0)+1;
+  });
+  return used;
 }
 function renderContent(){
   const listEl=document.getElementById('contentList');
@@ -1316,6 +1362,7 @@ function renderContent(){
       </div>
       <div style="font-size:11px;color:var(--accent);margin-top:5px">${esc(p.scheduled_at||'chưa đặt giờ')}</div>
       <div style="font-size:12px;color:var(--text2);margin-top:6px;line-height:1.45">${esc((p.message||'').slice(0,150))||'(trống)'}</div>
+      ${(p.image_url||p.photo_path)?'<div style="font-size:11px;color:var(--text2);margin-top:5px">🖼️ Có ảnh</div>':''}
     </div>`;
   }).join(''):'<div style="text-align:center;color:var(--text2);padding:18px">Chưa có bài. Bấm Bài mới để bắt đầu.</div>';
   if(_selectedContentId)fillContentForm(_contentPosts[_selectedContentId]);
@@ -1323,7 +1370,7 @@ function renderContent(){
 }
 function fillContentForm(p){
   if(!p)return;
-  const fields={contentId:p.id||'',contentMessage:p.message||'',contentPhoto:p.photo_path||'',contentLink:p.link||'',contentTime:p.scheduled_at||'',contentWebhook:localStorage.getItem('monsteaContentWebhook')||'http://localhost:5678/webhook/monstea-post-now'};
+  const fields={contentId:p.id||'',contentMessage:p.message||'',contentPhoto:p.image_url||p.photo_path||'',contentStoragePath:p.storage_path||'',contentLink:p.link||'',contentTime:p.scheduled_at||'',contentWebhook:localStorage.getItem('monsteaContentWebhook')||'http://localhost:5678/webhook/monstea-post-now'};
   Object.entries(fields).forEach(([id,val])=>{const el=document.getElementById(id);if(el&&document.activeElement!==el)el.value=val;});
   previewContentPost();
 }
@@ -1331,7 +1378,7 @@ function selectContentPost(id){_selectedContentId=id;fillContentForm(_contentPos
 function newContentPost(){
   _selectedContentId=contentId();
   const el=(id,val)=>{const n=document.getElementById(id);if(n)n.value=val};
-  el('contentId',_selectedContentId);el('contentMessage','');el('contentPhoto','');el('contentLink','');el('contentTime',contentNowIso());
+  el('contentId',_selectedContentId);el('contentMessage','');el('contentPhoto','');el('contentStoragePath','');el('contentLink','');el('contentTime',contentNowIso());
   el('contentWebhook',localStorage.getItem('monsteaContentWebhook')||'http://localhost:5678/webhook/monstea-post-now');
   previewContentPost();
 }
@@ -1345,6 +1392,8 @@ function readContentForm(status){
     scheduled_at:(document.getElementById('contentTime')?.value||'').trim()||contentNowIso(),
     message:document.getElementById('contentMessage')?.value||'',
     photo_path:(document.getElementById('contentPhoto')?.value||'').trim(),
+    image_url:(document.getElementById('contentPhoto')?.value||'').trim(),
+    storage_path:(document.getElementById('contentStoragePath')?.value||'').trim(),
     link:(document.getElementById('contentLink')?.value||'').trim(),
     updated_at:new Date().toISOString()
   };
@@ -1389,7 +1438,13 @@ function previewContentPost(){
   const m=document.getElementById('contentPreviewMessage'),t=document.getElementById('contentPreviewTime'),p=document.getElementById('contentPreviewPhoto');
   if(m)m.textContent=msg||'Chưa có nội dung';
   if(t)t.textContent=time;
-  if(p)p.textContent=photo||'Không có ảnh';
+  if(p){
+    if(/^https?:\/\//i.test(photo)){
+      p.innerHTML=`<img src="${esc(photo)}" alt="Preview" loading="lazy">`;
+    }else{
+      p.textContent=photo||'Không có ảnh';
+    }
+  }
 }
 function renderContentLog(){
   const el=document.getElementById('contentLog');if(!el)return;
@@ -1397,6 +1452,105 @@ function renderContentLog(){
   el.innerHTML=logs.length?logs.map(l=>`<div style="padding:6px 0;border-bottom:1px solid var(--border)"><b>${esc(l.event||l.level||'log')}</b> <span style="color:var(--text2)">${esc(l.post_id||'')}</span><div style="font-size:11px;color:var(--text2)">${esc(l.time||'')} ${esc(l.error||'')}</div></div>`).join(''):'Chưa có log.';
 }
 document.addEventListener('input',e=>{if(e.target&&['contentMessage','contentPhoto','contentTime'].includes(e.target.id))previewContentPost();});
+
+// ═══════════════════════════════════════
+// MEDIA LIBRARY
+// ═══════════════════════════════════════
+function mediaArray(){
+  return Object.values(_mediaItems||{}).filter(Boolean).sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''));
+}
+function mediaSafeName(name){
+  return String(name||'image').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9._-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80)||'image';
+}
+function mediaSize(bytes){
+  if(!bytes)return'0 KB';
+  if(bytes<1024*1024)return Math.round(bytes/1024)+' KB';
+  return (bytes/1024/1024).toFixed(1)+' MB';
+}
+function renderMedia(){
+  const list=document.getElementById('mediaList');
+  if(!list)return;
+  const items=mediaArray();
+  const usage=contentMediaUsage();
+  const usedCount=items.filter(m=>usage[m.storage_path]||usage[m.url]).length;
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v};
+  set('mediaTotal',items.length);set('mediaUsed',usedCount);set('mediaUnused',Math.max(0,items.length-usedCount));
+  list.innerHTML=items.length?items.map(m=>{
+    const used=usage[m.storage_path]||usage[m.url]||0;
+    return `<div class="media-card">
+      <div class="media-thumb">${m.url?`<img src="${esc(m.url)}" alt="${esc(m.title||m.file_name||'Media')}" loading="lazy">`:'Không có ảnh'}</div>
+      <div class="media-title">${esc(m.title||m.file_name||m.id)}</div>
+      <div class="media-meta">${esc(mediaSize(m.size))} · ${esc((m.created_at||'').slice(0,10))} · ${used?`đang dùng ${used} bài`:'chưa dùng'}</div>
+      <div class="media-actions">
+        <button class="btn btn-outline btn-sm" onclick="useMediaInContent('${esc(m.id)}')">Chọn cho bài</button>
+        <button class="btn btn-outline btn-sm" onclick="copyMediaUrl('${esc(m.id)}')">Copy URL</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteMedia('${esc(m.id)}')">Xóa</button>
+      </div>
+    </div>`;
+  }).join(''):'<div style="text-align:center;color:var(--text2);padding:18px">Chưa có ảnh. Upload ảnh đầu tiên để dùng cho Content.</div>';
+}
+async function uploadMedia(){
+  const file=document.getElementById('mediaFile')?.files?.[0];
+  const status=document.getElementById('mediaUploadStatus');
+  if(!file){showToast('⚠️ Chưa chọn ảnh');return;}
+  if(!fbDb||!fbStorage){showToast('❌ Chưa kết nối Firebase Storage');return;}
+  if(!file.type.startsWith('image/')){showToast('⚠️ File phải là ảnh');return;}
+  if(file.size>8*1024*1024){showToast('⚠️ Ảnh nên dưới 8MB');return;}
+  const now=new Date();
+  const id='media-'+Date.now();
+  const ym=now.toISOString().slice(0,7).replace('-','/');
+  const safe=mediaSafeName(file.name);
+  const storage_path=`zaklife/media/${ym}/${id}-${safe}`;
+  const title=(document.getElementById('mediaTitle')?.value||file.name).trim();
+  try{
+    if(status)status.textContent='Đang upload...';
+    const ref=fbStorage.ref(storage_path);
+    const task=ref.put(file,{contentType:file.type});
+    task.on('state_changed',snap=>{
+      if(status)status.textContent='Đang upload '+Math.round((snap.bytesTransferred/snap.totalBytes)*100)+'%';
+    });
+    await task;
+    const url=await ref.getDownloadURL();
+    const item={id,title,file_name:file.name,content_type:file.type,size:file.size,storage_path,url,created_at:now.toISOString(),updated_at:now.toISOString()};
+    await fbDb.ref('zaklife/media/'+id).set(item);
+    document.getElementById('mediaFile').value='';
+    document.getElementById('mediaTitle').value='';
+    if(status)status.textContent='Đã upload: '+title;
+    showToast('✅ Đã upload ảnh');
+  }catch(e){
+    if(status)status.textContent='Lỗi upload: '+e.message;
+    showToast('❌ Lỗi upload: '+e.message);
+  }
+}
+function useMediaInContent(id){
+  const m=_mediaItems[id];
+  if(!m||!m.url){showToast('⚠️ Không tìm thấy ảnh');return;}
+  switchTab('content');
+  const photo=document.getElementById('contentPhoto'),path=document.getElementById('contentStoragePath');
+  if(photo)photo.value=m.url;
+  if(path)path.value=m.storage_path||'';
+  previewContentPost();
+  showToast('🖼️ Đã gắn ảnh vào bài');
+}
+async function copyMediaUrl(id){
+  const url=_mediaItems[id]?.url;
+  if(!url){showToast('⚠️ Không có URL');return;}
+  try{await navigator.clipboard.writeText(url);showToast('✅ Đã copy URL');}
+  catch(e){showToast('URL: '+url);}
+}
+async function deleteMedia(id){
+  const m=_mediaItems[id];
+  if(!m){showToast('⚠️ Không tìm thấy ảnh');return;}
+  const usage=contentMediaUsage();
+  const used=usage[m.storage_path]||usage[m.url]||0;
+  if(used){showToast('⚠️ Ảnh đang được dùng trong '+used+' bài, chưa xóa');return;}
+  if(!confirm('Xóa ảnh '+(m.title||m.file_name||id)+' khỏi Media?'))return;
+  try{
+    if(m.storage_path&&fbStorage)await fbStorage.ref(m.storage_path).delete().catch(e=>{if(e.code!=='storage/object-not-found')throw e;});
+    await fbDb.ref('zaklife/media/'+id).remove();
+    showToast('🗑️ Đã xóa ảnh');
+  }catch(e){showToast('❌ Lỗi xóa: '+e.message);}
+}
 
 // ═══════════════════════════════════════
 // INIT

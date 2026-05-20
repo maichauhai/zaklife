@@ -109,6 +109,14 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 .status-badge.failed{color:var(--red);border-color:rgba(248,113,113,0.4);background:rgba(248,113,113,0.1)}
 .fb-preview{background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:14px;padding:14px}
 .fb-preview-photo{min-height:130px;border:1px dashed var(--border);border-radius:12px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--text2);font-size:12px;margin-top:12px;padding:12px;word-break:break-all}
+.fb-preview-photo img{width:100%;max-height:320px;object-fit:cover;border-radius:10px}
+.media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.media-card{border:1px solid var(--border);background:rgba(255,255,255,0.03);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.media-thumb{aspect-ratio:4/3;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.04);overflow:hidden;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:12px;text-align:center}
+.media-thumb img{width:100%;height:100%;object-fit:cover}
+.media-title{font-size:13px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.media-meta{font-size:11px;color:var(--text2);line-height:1.35}
+.media-actions{display:flex;gap:6px;flex-wrap:wrap}
 
 /* Modal */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;align-items:flex-end;justify-content:center}
