@@ -24,6 +24,7 @@
   <button class="nav-item" onclick="switchTab('habits')"><span>📅</span><span>Calendar</span></button>
   <button class="nav-item" onclick="openTrading()"><span>📈</span><span>Trading</span></button>
   <button class="nav-item" onclick="switchTab('settings')"><span>⚙️</span><span>Settings</span></button>
+  <button class="nav-item" onclick="switchTab('content')"><span>📣</span><span>Content</span></button>
   <button class="nav-item" onclick="openVault()"><span>🔐</span><span>Vault</span></button>
 </nav>
 
@@ -47,6 +48,7 @@
     <div class="card-title">🍵 Monstea hôm nay</div>
     <div id="monsteaStats" style="font-size:13px;color:var(--text2)">Đang tải...</div>
     <div id="monsteaNotes" style="margin-top:8px"></div>
+    <button class="btn btn-outline btn-sm" onclick="switchTab('content')" style="display:inline-flex;margin-top:10px">🗓️ Lịch bài fanpage</button>
   </div>
 
   <div class="stat-row">
@@ -184,6 +186,58 @@
   <div class="card">
     <div class="card-title">ℹ️ About</div>
     <div style="font-size:12px;color:var(--text2)">ZakLife v1.0 — Personal Dashboard<br>Built with ❤️ by Kyoko</div>
+  </div>
+</div>
+
+<!-- ═══ CONTENT ═══ -->
+<div class="section" id="sec-content">
+  <div class="stat-row">
+    <div class="stat-box"><div class="stat-value" id="contentTotal">0</div><div class="stat-label">Tổng bài</div></div>
+    <div class="stat-box"><div class="stat-value" id="contentDraft">0</div><div class="stat-label">Draft</div></div>
+    <div class="stat-box"><div class="stat-value" id="contentPosted">0</div><div class="stat-label">Đã đăng</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📣 Content Fanpage Monstea</div>
+    <div class="card-subtitle">Soạn bài, preview, duyệt lịch. n8n sẽ tự đăng bài có trạng thái approved khi tới giờ.</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm" onclick="newContentPost()">➕ Bài mới</button>
+      <button class="btn btn-outline btn-sm" onclick="renderContent()">↻ Làm mới</button>
+    </div>
+    <div id="contentList"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">✍️ Soạn bài</div>
+    <div style="display:grid;gap:10px">
+      <input class="gratitude-input" id="contentId" placeholder="ID bài viết">
+      <textarea class="journal-entry" id="contentMessage" placeholder="Nội dung bài đăng Facebook..." style="min-height:150px"></textarea>
+      <input class="gratitude-input" id="contentPhoto" placeholder="Ảnh: C:/Users/pc/Desktop/Monstea/n8n/media/anh.jpg hoặc URL ảnh">
+      <input class="gratitude-input" id="contentLink" placeholder="Link đính kèm (tuỳ chọn)">
+      <input class="gratitude-input" id="contentTime" placeholder="Giờ đăng: 2026-05-21T18:30:00+07:00">
+      <input class="gratitude-input" id="contentWebhook" placeholder="Webhook n8n đăng ngay (mặc định http://localhost:5678/webhook/monstea-post-now)">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="saveContentPost('draft')">💾 Lưu nháp</button>
+        <button class="btn btn-outline btn-sm" onclick="saveContentPost('approved')" style="color:var(--green);border-color:rgba(52,211,153,0.35)">✅ Duyệt & hẹn giờ</button>
+        <button class="btn btn-outline btn-sm" onclick="postNowContentPost()" style="color:var(--yellow);border-color:rgba(251,191,36,0.35)">⚡ Đăng ngay</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteContentPost()">🗑️ Xóa</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">👀 Preview Facebook</div>
+    <div class="fb-preview">
+      <div style="font-weight:700">Monstea - Hội Quán Ăn Vặt 257</div>
+      <div id="contentPreviewTime" style="font-size:11px;color:var(--text2);margin:2px 0 10px">Draft</div>
+      <div id="contentPreviewMessage" style="white-space:pre-wrap;font-size:13px;color:var(--text)">Chưa có nội dung</div>
+      <div id="contentPreviewPhoto" class="fb-preview-photo">Không có ảnh</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📜 Log trạng thái</div>
+    <div id="contentLog" style="font-size:12px;color:var(--text2)">Đang tải...</div>
   </div>
 </div>
 
@@ -393,6 +447,7 @@ function switchTab(tab){
   if(tab==='habits')renderHabits();
   if(tab==='history')renderHistory();
   if(tab==='settings')renderSettings();
+  if(tab==='content')renderContent();
   if(tab==='vault'){}  // vault handled separately
 }
 function openVault(){
@@ -1027,6 +1082,14 @@ function initFirebase(){
       _monsteaHistory=snap.val()||{};
       renderMonsteaCard();
     });
+    fbDb.ref('zaklife/content-calendar').on('value',snap=>{
+      _contentPosts=snap.val()||{};
+      renderContent();
+    });
+    fbDb.ref('zaklife/content-log').limitToLast(20).on('value',snap=>{
+      _contentLog=snap.val()||{};
+      renderContentLog();
+    });
   }catch(e){logger('Firebase error: '+e)}
 }
 
@@ -1215,6 +1278,125 @@ function toggleMonsteaNote(noteId){
     logger('Note #'+noteId+' toggled '+(isDone?'done':'undone'));
   });
 }
+
+// ═══════════════════════════════════════
+// CONTENT MARKETING
+// ═══════════════════════════════════════
+let _contentPosts={},_contentLog={},_selectedContentId=null;
+
+function contentArray(){
+  return Object.values(_contentPosts||{}).filter(Boolean).sort((a,b)=>{
+    const at=a.scheduled_at||'',bt=b.scheduled_at||'';
+    if(a.status==='posted'&&b.status!=='posted')return 1;
+    if(a.status!=='posted'&&b.status==='posted')return -1;
+    return at.localeCompare(bt);
+  });
+}
+function contentId(){return 'monstea-'+Date.now()}
+function contentValidId(id){return id&&!/[.#$/\[\]]/.test(id)}
+function contentStatusClass(s){return ['approved','posted','failed'].includes(s)?s:'draft'}
+function contentNowIso(){
+  const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
+  return d.toISOString().slice(0,19)+'+07:00';
+}
+function renderContent(){
+  const listEl=document.getElementById('contentList');
+  if(!listEl)return;
+  const posts=contentArray();
+  const total=posts.length,draft=posts.filter(p=>(p.status||'draft')==='draft').length,posted=posts.filter(p=>p.status==='posted').length;
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v};
+  set('contentTotal',total);set('contentDraft',draft);set('contentPosted',posted);
+  if(!_selectedContentId&&posts.length)_selectedContentId=posts[0].id;
+  listEl.innerHTML=posts.length?posts.map(p=>{
+    const active=p.id===_selectedContentId?'content-card active':'content-card';
+    return `<div class="${active}" onclick="selectContentPost('${esc(p.id)}')">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+        <b style="font-size:12px">${esc(p.id)}</b>
+        <span class="status-badge ${contentStatusClass(p.status)}">${esc(p.status||'draft')}</span>
+      </div>
+      <div style="font-size:11px;color:var(--accent);margin-top:5px">${esc(p.scheduled_at||'chưa đặt giờ')}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:6px;line-height:1.45">${esc((p.message||'').slice(0,150))||'(trống)'}</div>
+    </div>`;
+  }).join(''):'<div style="text-align:center;color:var(--text2);padding:18px">Chưa có bài. Bấm Bài mới để bắt đầu.</div>';
+  if(_selectedContentId)fillContentForm(_contentPosts[_selectedContentId]);
+  renderContentLog();
+}
+function fillContentForm(p){
+  if(!p)return;
+  const fields={contentId:p.id||'',contentMessage:p.message||'',contentPhoto:p.photo_path||'',contentLink:p.link||'',contentTime:p.scheduled_at||'',contentWebhook:localStorage.getItem('monsteaContentWebhook')||'http://localhost:5678/webhook/monstea-post-now'};
+  Object.entries(fields).forEach(([id,val])=>{const el=document.getElementById(id);if(el&&document.activeElement!==el)el.value=val;});
+  previewContentPost();
+}
+function selectContentPost(id){_selectedContentId=id;fillContentForm(_contentPosts[id]);renderContent();}
+function newContentPost(){
+  _selectedContentId=contentId();
+  const el=(id,val)=>{const n=document.getElementById(id);if(n)n.value=val};
+  el('contentId',_selectedContentId);el('contentMessage','');el('contentPhoto','');el('contentLink','');el('contentTime',contentNowIso());
+  el('contentWebhook',localStorage.getItem('monsteaContentWebhook')||'http://localhost:5678/webhook/monstea-post-now');
+  previewContentPost();
+}
+function readContentForm(status){
+  const id=(document.getElementById('contentId')?.value||'').trim()||contentId();
+  const webhook=(document.getElementById('contentWebhook')?.value||'').trim();
+  if(webhook)localStorage.setItem('monsteaContentWebhook',webhook);
+  return {
+    id,
+    status:status||(_contentPosts[id]?.status||'draft'),
+    scheduled_at:(document.getElementById('contentTime')?.value||'').trim()||contentNowIso(),
+    message:document.getElementById('contentMessage')?.value||'',
+    photo_path:(document.getElementById('contentPhoto')?.value||'').trim(),
+    link:(document.getElementById('contentLink')?.value||'').trim(),
+    updated_at:new Date().toISOString()
+  };
+}
+function saveContentPost(status){
+  const post=readContentForm(status);
+  if(!contentValidId(post.id)){showToast('⚠️ ID không được chứa . # $ / [ ]');return;}
+  if(!post.message.trim()&&!post.photo_path&&!post.link){showToast('⚠️ Bài chưa có nội dung');return;}
+  if(!fbDb){showToast('❌ Chưa kết nối Firebase');return;}
+  _selectedContentId=post.id;
+  fbDb.ref('zaklife/content-calendar/'+post.id).set(post)
+    .then(()=>showToast(status==='approved'?'✅ Đã duyệt lịch đăng':'💾 Đã lưu nháp'))
+    .catch(e=>showToast('❌ Lỗi lưu: '+e.message));
+}
+function postNowContentPost(){
+  const post=readContentForm('approved');
+  if(!contentValidId(post.id)){showToast('⚠️ ID không được chứa . # $ / [ ]');return;}
+  post.scheduled_at=contentNowIso();
+  _selectedContentId=post.id;
+  if(!fbDb){showToast('❌ Chưa kết nối Firebase');return;}
+  fbDb.ref('zaklife/content-calendar/'+post.id).set(post).then(()=>{
+    const url=(document.getElementById('contentWebhook')?.value||'').trim();
+    if(!url){showToast('✅ Đã đưa vào hàng chờ đăng');return;}
+    const hook=url+(url.includes('?')?'&':'?')+'post_id='+encodeURIComponent(post.id);
+    return fetch(hook,{method:'POST',mode:'no-cors'})
+      .then(()=>showToast('⚡ Đã gọi n8n đăng ngay'))
+      .catch(()=>showToast('✅ Đã duyệt. Nếu webhook chưa mở, n8n sẽ đăng ở lần poll tiếp theo.'));
+  }).catch(e=>showToast('❌ Lỗi: '+e.message));
+}
+function deleteContentPost(){
+  const id=(document.getElementById('contentId')?.value||_selectedContentId||'').trim();
+  if(!contentValidId(id)){showToast('⚠️ ID không hợp lệ');return;}
+  if(!id||!confirm('Xóa bài '+id+'?'))return;
+  fbDb.ref('zaklife/content-calendar/'+id).remove().then(()=>{
+    _selectedContentId=null;showToast('🗑️ Đã xóa bài');newContentPost();
+  });
+}
+function previewContentPost(){
+  const msg=document.getElementById('contentMessage')?.value||'';
+  const time=document.getElementById('contentTime')?.value||'Draft';
+  const photo=document.getElementById('contentPhoto')?.value||'';
+  const m=document.getElementById('contentPreviewMessage'),t=document.getElementById('contentPreviewTime'),p=document.getElementById('contentPreviewPhoto');
+  if(m)m.textContent=msg||'Chưa có nội dung';
+  if(t)t.textContent=time;
+  if(p)p.textContent=photo||'Không có ảnh';
+}
+function renderContentLog(){
+  const el=document.getElementById('contentLog');if(!el)return;
+  const logs=Object.values(_contentLog||{}).filter(Boolean).sort((a,b)=>(b.time||'').localeCompare(a.time||'')).slice(0,12);
+  el.innerHTML=logs.length?logs.map(l=>`<div style="padding:6px 0;border-bottom:1px solid var(--border)"><b>${esc(l.event||l.level||'log')}</b> <span style="color:var(--text2)">${esc(l.post_id||'')}</span><div style="font-size:11px;color:var(--text2)">${esc(l.time||'')} ${esc(l.error||'')}</div></div>`).join(''):'Chưa có log.';
+}
+document.addEventListener('input',e=>{if(e.target&&['contentMessage','contentPhoto','contentTime'].includes(e.target.id))previewContentPost();});
 
 // ═══════════════════════════════════════
 // INIT

@@ -100,6 +100,16 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 .nav-item span:first-child{font-size:20px}
 .nav-item span:last-child{font-size:10px;font-weight:500}
 
+/* Content Marketing */
+.content-card{padding:12px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,0.03);margin-bottom:8px;cursor:pointer;transition:.2s}
+.content-card:hover,.content-card.active{border-color:rgba(251,191,36,0.55);background:rgba(251,191,36,0.07)}
+.status-badge{font-size:10px;text-transform:uppercase;padding:3px 7px;border-radius:999px;border:1px solid var(--border);color:var(--text2);font-weight:700}
+.status-badge.approved{color:var(--green);border-color:rgba(52,211,153,0.4);background:rgba(52,211,153,0.1)}
+.status-badge.posted{color:var(--blue);border-color:rgba(96,165,250,0.4);background:rgba(96,165,250,0.1)}
+.status-badge.failed{color:var(--red);border-color:rgba(248,113,113,0.4);background:rgba(248,113,113,0.1)}
+.fb-preview{background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:14px;padding:14px}
+.fb-preview-photo{min-height:130px;border:1px dashed var(--border);border-radius:12px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--text2);font-size:12px;margin-top:12px;padding:12px;word-break:break-all}
+
 /* Modal */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;align-items:flex-end;justify-content:center}
 .modal-overlay.show{display:flex}
