@@ -1506,10 +1506,14 @@ async function uploadMedia(){
     if(status)status.textContent='Đang upload...';
     const ref=fbStorage.ref(storage_path);
     const task=ref.put(file,{contentType:file.type});
-    task.on('state_changed',snap=>{
-      if(status)status.textContent='Đang upload '+Math.round((snap.bytesTransferred/snap.totalBytes)*100)+'%';
+    const uploadPromise=new Promise((resolve,reject)=>{
+      task.on('state_changed',snap=>{
+        const pct=snap.totalBytes?Math.max(1,Math.round((snap.bytesTransferred/snap.totalBytes)*100)):0;
+        if(status)status.textContent='Đang upload '+pct+'%';
+      },reject,resolve);
     });
-    await task;
+    const timeout=new Promise((_,reject)=>setTimeout(()=>reject(new Error('Upload quá lâu. Có thể Firebase Storage chưa bật hoặc bị chặn quyền ghi.')),30000));
+    await Promise.race([uploadPromise,timeout]);
     const url=await ref.getDownloadURL();
     const item={id,title,file_name:file.name,content_type:file.type,size:file.size,storage_path,url,created_at:now.toISOString(),updated_at:now.toISOString()};
     await fbDb.ref('zaklife/media/'+id).set(item);
@@ -1518,9 +1522,18 @@ async function uploadMedia(){
     if(status)status.textContent='Đã upload: '+title;
     showToast('✅ Đã upload ảnh');
   }catch(e){
-    if(status)status.textContent='Lỗi upload: '+e.message;
-    showToast('❌ Lỗi upload: '+e.message);
+    const msg=mediaUploadErrorMessage(e);
+    if(status)status.textContent='Lỗi upload: '+msg;
+    showToast('❌ '+msg);
   }
+}
+function mediaUploadErrorMessage(e){
+  const code=e?.code||'',msg=e?.message||String(e||'Không rõ lỗi');
+  if(code==='storage/unauthorized')return'Firebase Storage chưa cho phép upload. Cần chỉnh Storage rules.';
+  if(code==='storage/bucket-not-found'||/bucket|not found/i.test(msg))return'Firebase Storage bucket chưa tồn tại hoặc chưa bật cho project monstea-pos.';
+  if(code==='storage/canceled')return'Upload đã bị hủy.';
+  if(code==='storage/retry-limit-exceeded')return'Upload bị timeout, kiểm tra mạng hoặc quyền Storage.';
+  return msg;
 }
 function useMediaInContent(id){
   const m=_mediaItems[id];
