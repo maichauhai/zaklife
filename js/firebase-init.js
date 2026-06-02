@@ -66,6 +66,27 @@
     if(value&&typeof value==="object")return Object.entries(value).map(([id,item])=>({id,...item})).filter(Boolean);
     return [];
   };
+  ZL.invoiceKey=function(inv){
+    if(!inv)return "";
+    if(inv.syncId)return "sync:"+inv.syncId;
+    const date=inv.date||"";
+    const id=inv.id!=null?String(inv.id):"";
+    if(date&&id)return `date-id:${date}:${id}`;
+    const time=inv.time||inv.createdAt||inv._lastModified||"";
+    const total=inv.total!=null?String(inv.total):"";
+    return `${date}|${id}|${time}|${total}`;
+  };
+  ZL.mergeInvoices=function(){
+    const map=new Map();
+    Array.from(arguments).flat().filter(Boolean).forEach(inv=>{
+      const key=ZL.invoiceKey(inv)||`anon:${map.size}`;
+      const prev=map.get(key);
+      const prevTs=Number(prev?._lastModified||prev?.createdAt||0);
+      const nextTs=Number(inv?._lastModified||inv?.createdAt||0);
+      if(!prev||nextTs>=prevTs)map.set(key,inv);
+    });
+    return [...map.values()];
+  };
   ZL.lastDates=function(days){
     const out=[];
     const base=new Date(ZL.today()+"T00:00:00");
@@ -124,9 +145,13 @@
   };
   ZL.invoiceListForDate=function(date){
     const pos=ZL.state.pos||{};
-    if(date===ZL.today())return ZL.normalizeList(pos.todayInvoices);
     const archive=pos.invoiceArchive||{};
-    return ZL.normalizeList(archive[date]);
+    const archived=ZL.normalizeList(archive[date]).filter(inv=>!inv.date||inv.date===date);
+    if(date===ZL.today()){
+      const live=ZL.normalizeList(pos.todayInvoices).filter(inv=>!inv.date||inv.date===date);
+      return ZL.mergeInvoices(archived,live);
+    }
+    return archived;
   };
   ZL.activeInvoices=function(date){
     return ZL.invoiceListForDate(date).filter(i=>!i.cancelled&&!i._deleted);
@@ -135,20 +160,40 @@
     return ZL.activeInvoices(date).filter(i=>i.method!=="staff");
   };
   ZL.invoiceStats=function(date){
+    const pos=ZL.state.pos||{};
+    const history=(pos.history||{})[date]||null;
     const invoices=ZL.revenueInvoices(date);
-    const total=invoices.reduce((s,i)=>s+(Number(i.total)||0),0);
-    const avg=invoices.length?Math.round(total/invoices.length):0;
+    const invoiceTotal=invoices.reduce((s,i)=>s+(Number(i.total)||0),0);
+    const historyTotal=Number(history?.totalRevenue);
+    const historyCount=Number(history?.invoices);
+    const hasHistory=history&&Number.isFinite(historyTotal);
+    const total=hasHistory?historyTotal:invoiceTotal;
+    const count=hasHistory&&Number.isFinite(historyCount)?historyCount:invoices.length;
+    const avg=count?Math.round(total/count):0;
     const itemMap={};
-    invoices.forEach(inv=>(inv.items||[]).forEach(item=>{
-      const name=item.name||"Món";
-      const qty=Number(item.qty)||1;
-      const price=Number(item.price)||0;
-      if(!itemMap[name])itemMap[name]={name,qty:0,revenue:0};
-      itemMap[name].qty+=qty;
-      itemMap[name].revenue+=price*qty;
-    }));
+    const byId=history?.itemsSoldById&&Object.keys(history.itemsSoldById).length?history.itemsSoldById:null;
+    if(byId){
+      Object.entries(byId).forEach(([menuId,data])=>{
+        const name=data?.name||String(menuId);
+        itemMap[name]={name,qty:Number(data?.qty)||0,revenue:Number(data?.revenue)||0};
+      });
+    }else if(history?.itemsSold&&Object.keys(history.itemsSold).length){
+      Object.entries(history.itemsSold).forEach(([name,data])=>{
+        itemMap[name]={name,qty:Number(data?.qty)||0,revenue:Number(data?.revenue)||0};
+      });
+    }else{
+      invoices.forEach(inv=>(inv.items||[]).forEach(item=>{
+        const name=item.name||"Món";
+        const qty=Number(item.qty)||1;
+        const price=Number(item.price)||0;
+        if(!itemMap[name])itemMap[name]={name,qty:0,revenue:0};
+        itemMap[name].qty+=qty;
+        itemMap[name].revenue+=price*qty;
+      }));
+    }
     const topItems=Object.values(itemMap).sort((a,b)=>b.qty-a.qty||b.revenue-a.revenue);
-    return {invoices,total,avg,topItems,top:topItems[0]||null};
+    const diff=hasHistory?historyTotal-invoiceTotal:0;
+    return {invoices,total,avg,count,topItems,top:topItems[0]||null,history,hasHistory,historyTotal,invoiceTotal,diff};
   };
   ZL.contentPosts=function(){
     return ZL.normalizeList(ZL.state.content).map(p=>ZL.normalizePost(p));

@@ -125,7 +125,7 @@
       </div>
       <div class="monstea-line">
         <strong class="accent-value">${ZL.money(stats.total)}</strong>
-        <span class="badge blue">${stats.invoices.length} đơn</span>
+        <span class="badge blue">${stats.count} đơn</span>
         ${pct===null?`<span class="muted small">Chưa có số hôm qua</span>`:`<span class="${pct>=0?"accent-value":"danger-value"} small">${pct>=0?"+":""}${pct}% vs hôm qua</span>`}
       </div>
       <div class="note-input-row">
@@ -237,7 +237,7 @@
     const balance=ZL.state.wallet?.balances;
     const balanceAge=staleMinutes(balance?.updatedAt);
     const items=[];
-    if(!stats.invoices.length)items.push({route:"pos",label:"Kiểm tra POS hôm nay",meta:"Chưa có đơn ghi nhận"});
+    if(!stats.count)items.push({route:"pos",label:"Kiểm tra POS hôm nay",meta:"Chưa có đơn ghi nhận"});
     if(activeNotes.length)items.push({route:"dashboard",label:`Xử lý ${activeNotes.length} ghi chú Monstea`,meta:activeNotes[0]?.text||"Ghi chú vận hành"});
     if(overdue.length)items.push({route:"tasks",label:`Dọn ${overdue.length} task quá hạn`,meta:overdue[0]?.title||"Task quá hạn"});
     if(dueToday.length)items.push({route:"tasks",label:`Làm ${dueToday.length} task hôm nay`,meta:dueToday[0]?.title||"Task hôm nay"});
@@ -261,7 +261,7 @@
         <div>
           <span class="badge success">Today Command</span>
           <h2>Hôm nay cần chú ý gì?</h2>
-          <p>${today} · ${stats.invoices.length} đơn · ${dueToday} task hôm nay · ${doneHabits} habit đã xong</p>
+          <p>${today} · ${stats.count} đơn · ${dueToday} task hôm nay · ${doneHabits} habit đã xong</p>
         </div>
         <div class="command-score">
           <strong>${ZL.money(stats.total)}</strong>
@@ -269,7 +269,7 @@
         </div>
       </div>
       <div class="command-grid">
-        <button class="command-card" data-route-jump="pos"><span>Monstea</span><strong>${ZL.money(stats.total)}</strong><em>${stats.invoices.length} đơn hôm nay</em></button>
+        <button class="command-card" data-route-jump="pos"><span>Monstea</span><strong>${ZL.money(stats.total)}</strong><em>${stats.count} đơn hôm nay</em></button>
         <button class="command-card" data-route-jump="tasks"><span>Tasks</span><strong>${dueToday}</strong><em>cần làm hôm nay</em></button>
         <button class="command-card" data-route-jump="content"><span>Content</span><strong>${posts}</strong><em>scheduled + approved</em></button>
         <button class="command-card" data-route-jump="journal"><span>Journal</span><strong>${entry.win?"Done":"Open"}</strong><em>${entry.win?"đã có win":"chưa review"}</em></button>
@@ -295,7 +295,7 @@
     const posts=ZL.contentPosts().filter(p=>p.scheduledDate===today);
     const openNotes=noteRows().filter(n=>!n.done);
     const lines=[];
-    lines.push(stats.invoices.length?`Monstea có ${stats.invoices.length} đơn, doanh thu ${ZL.money(stats.total)}.`:"Monstea hôm nay chưa có đơn ghi nhận.");
+    lines.push(stats.count?`Monstea có ${stats.count} đơn, doanh thu ${ZL.money(stats.total)}.`:"Monstea hôm nay chưa có đơn ghi nhận.");
     if(stats.top)lines.push(`Món nổi bật: ${stats.top.name} (${stats.top.qty} lượt).`);
     lines.push(done.length?`Hoàn thành ${done.length} task: ${done.slice(0,3).map(t=>t.title).join(", ")}.`:"Chưa có task nào được đánh dấu xong hôm nay.");
     if(pending.length)lines.push(`Còn ${pending.length} task hôm nay chưa xong.`);
@@ -426,7 +426,7 @@
     const posts=scheduledContentCount();
     const streak=habitStreak();
     const alerts=[];
-    if(!stats.invoices.length)alerts.push("Monstea hôm nay chưa có đơn ghi nhận.");
+    if(!stats.count)alerts.push("Monstea hôm nay chưa có đơn ghi nhận.");
     if(posts<3)alerts.push("Lịch content còn mỏng.");
     const approved=ZL.contentPosts().filter(p=>p.status==="approved").length;
     if(approved)alerts.push(`${approved} bài đã approved.`);
@@ -436,7 +436,7 @@
       ${renderDailyReview(today,stats)}
       <div class="grid grid-4">
         <div class="stat-card"><div class="stat-label">Doanh thu hôm nay</div><div class="stat-value accent-value">${ZL.money(stats.total)}</div><div class="stat-note">${today}</div></div>
-        <div class="stat-card"><div class="stat-label">Số đơn</div><div class="stat-value">${stats.invoices.length}</div><div class="stat-note">Không tính nội bộ</div></div>
+        <div class="stat-card"><div class="stat-label">Số đơn</div><div class="stat-value">${stats.count}</div><div class="stat-note">Không tính nội bộ</div></div>
         <div class="stat-card"><div class="stat-label">Content chờ lịch</div><div class="stat-value warning-value">${posts}</div><div class="stat-note">Scheduled + Approved</div></div>
         <div class="stat-card"><div class="stat-label">Habit streak</div><div class="stat-value blue-value">${streak}</div><div class="stat-note">Ngày liên tiếp</div></div>
       </div>

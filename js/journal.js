@@ -205,7 +205,7 @@
     const done=habits().filter(h=>log[h.id]).map(h=>`${h.icon||"•"} ${h.name}`);
     const stats=ZL.invoiceStats(selectedDate);
     const parts=[];
-    if(stats.invoices.length)parts.push(`Monstea ghi nhận ${stats.invoices.length} đơn, doanh thu ${ZL.money(stats.total)}.`);
+    if(stats.count)parts.push(`Monstea ghi nhận ${stats.count} đơn, doanh thu ${ZL.money(stats.total)}.`);
     if(done.length)parts.push(`Anh hoàn thành ${done.length} habit: ${done.join(", ")}.`);
     if((entry.text||"").trim())parts.push("Anh đã dành thời gian ghi lại nhật ký để nhìn rõ ngày hôm nay.");
     if((entry.brainDump||"").trim())parts.push("Anh đã xả suy nghĩ trong Brain Dump, giúp đầu óc nhẹ và rõ hơn.");
