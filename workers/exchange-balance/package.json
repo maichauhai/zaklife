@@ -1,0 +1,13 @@
+{
+  "name": "zaklife-exchange-balance-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "sync": "node sync-balance.js",
+    "loop": "node sync-balance.js --loop"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

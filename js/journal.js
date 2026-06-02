@@ -1,0 +1,317 @@
+(function(){
+  const ZL=window.ZL;
+  const MOODS=[
+    {emoji:"😁",label:"Tốt",score:9},
+    {emoji:"🙂",label:"Ổn",score:7},
+    {emoji:"😐",label:"Bình thường",score:5},
+    {emoji:"😟",label:"Lo",score:3},
+    {emoji:"😴",label:"Mệt",score:2}
+  ];
+  let selectedDate=ZL.today();
+  let calendarMonth=ZL.today().slice(0,7);
+
+  function entryFor(date){
+    return (ZL.state.zak.entries||{})[date]||{};
+  }
+
+  function habitLog(date){
+    return (ZL.state.zak.habitLog||{})[date]||{};
+  }
+
+  function habits(){
+    return Array.isArray(ZL.state.zak.habits)?ZL.state.zak.habits:[];
+  }
+
+  function habitStreak(id){
+    let streak=0;
+    const base=ZL.today();
+    for(let i=0;i<180;i++){
+      const key=ZL.addDays(base,-i);
+      if(habitLog(key)[id])streak++;
+      else if(i>0)break;
+    }
+    return streak;
+  }
+
+  function saveJournal(){
+    const active=document.querySelector(".mood-btn.active");
+    const mood=MOODS[Number(active?.dataset.mood||2)];
+    const gratitude=[1,2,3].map(i=>document.getElementById("gratitude"+i).value.trim()).filter(Boolean);
+    ZL.state.zak.entries=ZL.state.zak.entries||{};
+    ZL.state.zak.entries[selectedDate]={
+      ...entryFor(selectedDate),
+      mood:mood.score,
+      moodEmoji:mood.emoji,
+      moodLabel:mood.label,
+      energy:{
+        morning:Number(document.getElementById("energyMorning").value)||5,
+        afternoon:Number(document.getElementById("energyAfternoon").value)||5,
+        evening:Number(document.getElementById("energyEvening").value)||5
+      },
+      sleepQuality:Number(document.getElementById("sleepQuality").value)||3,
+      sleepHours:Number(document.getElementById("sleepHours").value)||0,
+      text:document.getElementById("journalText").value.trim(),
+      brainDump:document.getElementById("brainDump").value.trim(),
+      gratitude,
+      win:document.getElementById("winOfDay").value.trim(),
+      timestamp:ZL.nowIso()
+    };
+    ZL.syncZakData();
+    ZL.toast("Đã lưu journal");
+    render();
+  }
+
+  function toggleHabit(id,date=selectedDate){
+    ZL.state.zak.habitLog=ZL.state.zak.habitLog||{};
+    ZL.state.zak.habitLog[date]=ZL.state.zak.habitLog[date]||{};
+    ZL.state.zak.habitLog[date][id]=!ZL.state.zak.habitLog[date][id];
+    ZL.syncZakData();
+    render();
+  }
+
+  function drawMoodMini(){
+    const canvas=document.getElementById("moodMiniChart");
+    if(!canvas)return;
+    const box=canvas.getBoundingClientRect(),ratio=window.devicePixelRatio||1;
+    canvas.width=Math.max(1,Math.floor(box.width*ratio));
+    canvas.height=Math.max(1,Math.floor(box.height*ratio));
+    const ctx=canvas.getContext("2d");
+    ctx.scale(ratio,ratio);
+    const w=box.width,h=box.height,pad=18;
+    const entries=ZL.state.zak.entries||{};
+    const dates=ZL.lastDates(7);
+    const values=dates.map(d=>Number(entries[d]?.mood)||0);
+    ctx.clearRect(0,0,w,h);
+    ctx.strokeStyle="rgba(255,255,255,.08)";
+    for(let i=0;i<3;i++){
+      const y=pad+(h-pad*2)*i/2;
+      ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(w-pad,y);ctx.stroke();
+    }
+    const pts=values.map((v,i)=>({x:pad+(w-pad*2)*i/(values.length-1||1),y:h-pad-(h-pad*2)*(v/10)}));
+    ctx.beginPath();
+    pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
+    ctx.strokeStyle="#34d399";ctx.lineWidth=3;ctx.stroke();
+    pts.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,4,0,Math.PI*2);ctx.fillStyle="#10b981";ctx.fill();});
+  }
+
+  function renderEnergy(entry){
+    const energy=entry.energy||{};
+    return `<div class="well-card">
+      <div class="well-head"><div><h2>Năng lượng</h2><p>Sáng / chiều / tối</p></div><span class="badge blue">${Math.round(((Number(energy.morning)||5)+(Number(energy.afternoon)||5)+(Number(energy.evening)||5))/3)}/10</span></div>
+      <div class="range-row"><label>Sáng</label><input type="range" min="1" max="10" id="energyMorning" value="${ZL.escape(energy.morning||5)}"></div>
+      <div class="range-row"><label>Chiều</label><input type="range" min="1" max="10" id="energyAfternoon" value="${ZL.escape(energy.afternoon||5)}"></div>
+      <div class="range-row"><label>Tối</label><input type="range" min="1" max="10" id="energyEvening" value="${ZL.escape(energy.evening||5)}"></div>
+    </div>`;
+  }
+
+  function renderSleep(entry){
+    const quality=Number(entry.sleepQuality||entry.sleep||3);
+    return `<div class="well-card">
+      <div class="well-head"><div><h2>Giấc ngủ</h2><p>Chất lượng + số giờ</p></div><span class="badge warning">${quality}/5</span></div>
+      <input type="hidden" id="sleepQuality" value="${quality}">
+      <div class="star-row">
+        ${[1,2,3,4,5].map(n=>`<button class="star-btn ${n<=quality?"active":""}" data-sleep="${n}">★</button>`).join("")}
+      </div>
+      <div class="field compact"><label>Số giờ ngủ</label><input type="number" min="0" max="14" step="0.5" id="sleepHours" value="${ZL.escape(entry.sleepHours||"")}"></div>
+    </div>`;
+  }
+
+  function renderMood(entry,moodIndex){
+    return `<div class="well-card">
+      <div class="well-head"><div><h2>Tâm trạng</h2><p>7 ngày gần nhất</p></div><span class="badge success">${ZL.escape(entry.moodLabel||"Chưa ghi")}</span></div>
+      <div class="mood-grid">
+        ${MOODS.map((m,i)=>`<button class="mood-btn ${i===moodIndex?"active":""}" data-mood="${i}" title="${ZL.escape(m.label)}">${m.emoji}</button>`).join("")}
+      </div>
+      <div class="mini-chart"><canvas id="moodMiniChart"></canvas></div>
+    </div>`;
+  }
+
+  function renderHabitList(date=selectedDate){
+    const log=habitLog(date);
+    if(!habits().length)return `<div class="empty slim">Chưa có habit</div>`;
+    return habits().map(h=>`<div class="habit-row">
+      <div>
+        <div class="item-title">${ZL.escape(h.icon||"•")} ${ZL.escape(h.name)}</div>
+        <div class="item-meta">Mỗi ${Number(h.cycleDays)||1} ngày · streak ${habitStreak(h.id)}</div>
+      </div>
+      <button class="btn sm ${log[h.id]?"primary":""}" data-habit-id="${ZL.escape(h.id)}">${log[h.id]?"Đã xong":"Chọn"}</button>
+    </div>`).join("");
+  }
+
+  function monthLabel(monthKey){
+    const [y,m]=monthKey.split("-").map(Number);
+    return `Tháng ${m} ${y}`;
+  }
+
+  function shiftMonth(delta){
+    const d=new Date(calendarMonth+"-01T00:00:00");
+    d.setMonth(d.getMonth()+delta);
+    calendarMonth=ZL.dateKey(d).slice(0,7);
+    render();
+  }
+
+  function doneIconsFor(date){
+    const log=habitLog(date);
+    return habits().filter(h=>log[h.id]).map(h=>h.icon||"•");
+  }
+
+  function renderHabitCalendar(){
+    const [year,month]=calendarMonth.split("-").map(Number);
+    const last=new Date(year,month,0).getDate();
+    const firstDay=new Date(year,month-1,1).getDay();
+    const cells=[];
+    for(let i=0;i<firstDay;i++)cells.push(`<div class="habit-cal-cell blank"></div>`);
+    for(let day=1;day<=last;day++){
+      const key=ZL.dateKey(new Date(year,month-1,day));
+      const icons=doneIconsFor(key);
+      const isSelected=key===selectedDate;
+      const isToday=key===ZL.today();
+      const missed=key<=ZL.today()&&!icons.length;
+      cells.push(`<button class="habit-cal-cell ${isSelected?"selected":""} ${isToday?"today":""}" data-select-date="${key}">
+        <strong>${day}</strong>
+        <div class="habit-cal-icons">${icons.slice(0,5).map(icon=>`<span>${ZL.escape(icon)}</span>`).join("")}${icons.length>5?`<small>+${icons.length-5}</small>`:""}${missed?`<em>⚠</em>`:""}</div>
+      </button>`);
+    }
+    const selectedLog=habitLog(selectedDate);
+    const selectedDone=habits().filter(h=>selectedLog[h.id]);
+    const selectedEntry=entryFor(selectedDate);
+    return `<div class="habit-calendar-card">
+      <div class="habit-cal-head">
+        <button class="icon-btn" id="habitPrevMonth">‹</button>
+        <h2>📅 ${monthLabel(calendarMonth)}</h2>
+        <button class="icon-btn" id="habitNextMonth">›</button>
+      </div>
+      <div class="habit-cal-weekdays">${["CN","T2","T3","T4","T5","T6","T7"].map(d=>`<span>${d}</span>`).join("")}</div>
+      <div class="habit-cal-grid">${cells.join("")}</div>
+      <div class="selected-day-panel">
+        <div class="panel-title">
+          <div><h2>Ngày ${selectedDate}</h2><p>${selectedDone.length?selectedDone.map(h=>`${h.icon||"•"} ${h.name}`).join(" · "):"Chưa tick habit"}</p></div>
+        </div>
+        <div class="selected-habit-list">
+          ${renderHabitList(selectedDate)}
+        </div>
+        <div class="selected-day-notes">
+          <div><strong>Journal</strong><p>${ZL.escape((selectedEntry.text||"").slice(0,160)||"Chưa ghi")}</p></div>
+          <div><strong>Brain dump</strong><p>${ZL.escape((selectedEntry.brainDump||"").slice(0,160)||"Chưa ghi")}</p></div>
+          <div><strong>Win</strong><p>${ZL.escape((selectedEntry.win||"").slice(0,180)||"Chưa ghi")}</p></div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function buildWinSuggestion(){
+    const entry=entryFor(selectedDate);
+    const log=habitLog(selectedDate);
+    const done=habits().filter(h=>log[h.id]).map(h=>`${h.icon||"•"} ${h.name}`);
+    const stats=ZL.invoiceStats(selectedDate);
+    const parts=[];
+    if(stats.invoices.length)parts.push(`Monstea ghi nhận ${stats.invoices.length} đơn, doanh thu ${ZL.money(stats.total)}.`);
+    if(done.length)parts.push(`Anh hoàn thành ${done.length} habit: ${done.join(", ")}.`);
+    if((entry.text||"").trim())parts.push("Anh đã dành thời gian ghi lại nhật ký để nhìn rõ ngày hôm nay.");
+    if((entry.brainDump||"").trim())parts.push("Anh đã xả suy nghĩ trong Brain Dump, giúp đầu óc nhẹ và rõ hơn.");
+    if(!parts.length)parts.push(`Anh đã quay lại ZakLife kiểm tra ngày ${selectedDate}, đây là một bước giữ nhịp tốt.`);
+    return `Hôm nay anh đã hoàn thành:\n\n${parts.map(p=>"- "+p).join("\n")}`;
+  }
+
+  function fillWinSuggestion(){
+    const el=document.getElementById("winOfDay");
+    if(!el)return;
+    const suggestion=buildWinSuggestion();
+    el.value=el.value.trim()?`${el.value.trim()}\n\n${suggestion}`:suggestion;
+  }
+
+  function recentEntries(){
+    const entries=ZL.state.zak.entries||{};
+    const rows=Object.keys(entries).sort().reverse().slice(0,5);
+    if(!rows.length)return `<div class="empty slim">Chưa có journal</div>`;
+    return rows.map(d=>{
+      const e=entries[d]||{};
+      const text=e.text||e.brainDump||e.win||"";
+      return `<button class="note-row journal-history-row" data-select-date="${ZL.escape(d)}">
+        <div>
+          <div class="item-title">${ZL.escape(e.moodEmoji||"•")} ${ZL.escape(d)}</div>
+          <div class="item-meta">${ZL.escape(text.slice(0,100))}</div>
+        </div>
+        <span class="badge">${ZL.escape(e.moodLabel||"--")}</span>
+      </button>`;
+    }).join("");
+  }
+
+  function bind(root){
+    root.querySelectorAll(".mood-btn").forEach(btn=>btn.onclick=()=>{
+      root.querySelectorAll(".mood-btn").forEach(x=>x.classList.remove("active"));
+      btn.classList.add("active");
+    });
+    root.querySelectorAll(".star-btn").forEach(btn=>btn.onclick=()=>{
+      document.getElementById("sleepQuality").value=btn.dataset.sleep;
+      root.querySelectorAll(".star-btn").forEach(x=>x.classList.toggle("active",Number(x.dataset.sleep)<=Number(btn.dataset.sleep)));
+    });
+    root.querySelectorAll("[data-habit-id]").forEach(btn=>btn.onclick=()=>toggleHabit(btn.dataset.habitId,selectedDate));
+    root.querySelectorAll("[data-select-date]").forEach(btn=>btn.onclick=()=>{
+      selectedDate=btn.dataset.selectDate;
+      calendarMonth=selectedDate.slice(0,7);
+      render();
+    });
+    document.getElementById("habitPrevMonth").onclick=()=>shiftMonth(-1);
+    document.getElementById("habitNextMonth").onclick=()=>shiftMonth(1);
+    document.getElementById("saveJournalBtn").onclick=saveJournal;
+    document.getElementById("suggestWinBtn").onclick=fillWinSuggestion;
+  }
+
+  function render(){
+    const root=document.getElementById("journalRoot");
+    if(!root)return;
+    const entry=entryFor(selectedDate);
+    const foundMood=MOODS.findIndex(m=>m.emoji===entry.moodEmoji);
+    const moodIndex=foundMood>=0?foundMood:2;
+    const gratitude=Array.isArray(entry.gratitude)?entry.gratitude:[];
+    root.innerHTML=`
+      <div class="selected-date-bar">
+        <div>
+          <span class="badge blue">Đang ghi ngày</span>
+          <strong>${selectedDate}</strong>
+        </div>
+        <button class="btn sm" data-select-date="${ZL.today()}">Về hôm nay</button>
+      </div>
+      <div class="wellbeing-grid">
+        ${renderMood(entry,moodIndex)}
+        ${renderEnergy(entry)}
+        ${renderSleep(entry)}
+      </div>
+      <div class="journal-write-grid" style="margin-top:16px">
+        <div class="panel">
+          <div class="panel-title"><div><h2>Daily Journal</h2><p>${selectedDate}</p></div></div>
+          <div class="field"><textarea id="journalText" placeholder="Hôm nay có gì đáng ghi?">${ZL.escape(entry.text||"")}</textarea></div>
+          <div class="grid grid-2">
+            <div class="field compact"><label>Biết ơn 1</label><input id="gratitude1" value="${ZL.escape(gratitude[0]||"")}"></div>
+            <div class="field compact"><label>Biết ơn 2</label><input id="gratitude2" value="${ZL.escape(gratitude[1]||"")}"></div>
+          </div>
+          <div class="field compact"><label>Biết ơn 3</label><input id="gratitude3" value="${ZL.escape(gratitude[2]||"")}"></div>
+          <div class="field"><label>Win of the Day</label><textarea id="winOfDay" class="win-textarea" placeholder="Hôm nay anh đã hoàn thành điều gì?">${ZL.escape(entry.win||"")}</textarea></div>
+          <button class="btn" id="suggestWinBtn">Gợi ý từ dữ liệu hôm nay</button>
+        </div>
+        <div class="panel">
+          <div class="panel-title"><div><h2>Brain Dump</h2><p>Xả suy nghĩ để sau này phân tích</p></div></div>
+          <div class="field"><textarea id="brainDump" class="tall" placeholder="Ghi thô, không cần cấu trúc">${ZL.escape(entry.brainDump||"")}</textarea></div>
+          <button class="btn primary" id="saveJournalBtn">Lưu ngày đang chọn</button>
+        </div>
+      </div>
+      <div class="layout-2 habit-layout" style="margin-top:16px">
+        <div class="panel">
+          <div class="panel-title"><div><h2>Habit Tracker</h2><p>Tick cho ngày ${selectedDate}</p></div><span class="badge success">${habits().length} habits</span></div>
+          ${renderHabitList(selectedDate)}
+        </div>
+        <div class="panel">
+          ${renderHabitCalendar()}
+          <div class="panel-title" style="margin-top:18px"><div><h2>Journal gần đây</h2></div></div>
+          ${recentEntries()}
+        </div>
+      </div>`;
+    bind(root);
+    requestAnimationFrame(drawMoodMini);
+  }
+
+  ZL.modules.journal={render};
+  ZL.on("zak",render);
+  window.addEventListener("resize",()=>{if(ZL.state.route==="journal")drawMoodMini();});
+})();
