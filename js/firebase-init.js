@@ -202,18 +202,43 @@
     const scheduled=p.scheduled_at||((p.scheduledDate||p.date||ZL.today())+"T"+(p.scheduledTime||p.time||"09:00"));
     const date=(p.scheduledDate||scheduled.slice(0,10)||ZL.today());
     const time=(p.scheduledTime||scheduled.slice(11,16)||"09:00");
+    const photoUrl=p.photoUrl||p.image_url||p.photo_path||p.thumbUrl||"";
+    const hasStoredOriginal=!!p.storagePath;
+    const driveFileId=p.driveFileId||extractDriveFileId(photoUrl);
+    const mediaProvider=p.mediaProvider||(driveFileId?"google_drive":(hasStoredOriginal?"firebase_storage":(photoUrl?"external_url":"")));
     return {
       ...p,
       id:p.id||("post-"+Date.now()),
       title:p.title||p.headline||"Bài chưa đặt tên",
       caption:p.caption||p.message||"",
-      photoUrl:p.photoUrl||p.image_url||p.photo_path||"",
+      photoUrl,
+      thumbUrl:p.thumbUrl||p.thumbnailUrl||(driveFileId?`https://drive.google.com/thumbnail?id=${encodeURIComponent(driveFileId)}&sz=w1000`:""),
+      storagePath:p.storagePath||"",
+      thumbStoragePath:p.thumbStoragePath||p.thumbnailStoragePath||"",
+      mediaProvider,
+      driveFileId,
+      mediaStatus:p.mediaStatus||(hasStoredOriginal?"ready":(photoUrl?"external_url":"empty")),
+      deleteOriginalAfterPost:p.deleteOriginalAfterPost!==false,
       scheduledDate:date,
       scheduledTime:time,
       scheduled_at:scheduled,
       status:p.status||"draft"
     };
   };
+  function extractDriveFileId(url){
+    const raw=String(url||"").trim();
+    const patterns=[
+      /drive\.google\.com\/file\/d\/([^/]+)/i,
+      /drive\.google\.com\/open\?id=([^&]+)/i,
+      /drive\.google\.com\/uc\?[^#]*id=([^&]+)/i,
+      /[?&]id=([^&]+)/i
+    ];
+    for(const pattern of patterns){
+      const match=raw.match(pattern);
+      if(match&&match[1])return decodeURIComponent(match[1]);
+    }
+    return "";
+  }
   ZL.initFirebase=function(){
     if(!window.firebase){
       ZL.setSync("error","Thiếu Firebase SDK");
