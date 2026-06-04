@@ -134,7 +134,8 @@
   function normalizeHabit(h){
     return {
       ...h,
-      cycleDays:Math.max(1,Number(h?.cycleDays||h?.cycle)||1)
+      name:String(h?.name||"").trim(),
+      cycleDays:Math.max(1,Number(h?.cycle??h?.cycleDays)||1)
     };
   }
 
