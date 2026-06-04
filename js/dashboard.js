@@ -319,31 +319,11 @@
           </div>`;
         }).join("")}
       </div>`:`<div class="empty slim">Chưa có heartbeat. Worker sẽ ghi vào Firebase path <code>zaklife/automation/monsteaFacebook</code> sau lần chạy kế tiếp.</div>`}
+      <div class="automation-team">
+        <div class="panel-title"><div><h3>AI Team</h3><p>Trạng thái các worker/assistant chính.</p></div></div>
+        <div class="agent-list">${renderAgents()}</div>
+      </div>
     </div>`;
-  }
-
-  function commandItems(today,stats,posts,streak){
-    const tasks=taskRows();
-    const dueToday=tasks.filter(t=>t.status!=="done"&&t.dueDate===today);
-    const overdue=tasks.filter(t=>isTaskOverdue(t,today));
-    const activeNotes=noteRows().filter(n=>!n.done);
-    const todayEntry=(ZL.state.zak.entries||{})[today]||{};
-    const todayPosts=ZL.contentPosts().filter(p=>p.scheduledDate===today&&p.status!=="posted");
-    const balance=ZL.state.wallet?.balances;
-    const balanceAge=staleMinutes(balance?.updatedAt);
-    const automation=automationHealth(ZL.state.automation?.monsteaFacebook);
-    const items=[];
-    if(!stats.count)items.push({route:"pos",label:"Kiểm tra POS hôm nay",meta:"Chưa có đơn ghi nhận"});
-    if(activeNotes.length)items.push({route:"dashboard",label:`Xử lý ${activeNotes.length} ghi chú Monstea`,meta:activeNotes[0]?.text||"Ghi chú vận hành"});
-    if(overdue.length)items.push({route:"tasks",label:`Dọn ${overdue.length} task quá hạn`,meta:overdue[0]?.title||"Task quá hạn"});
-    if(dueToday.length)items.push({route:"tasks",label:`Làm ${dueToday.length} task hôm nay`,meta:dueToday[0]?.title||"Task hôm nay"});
-    if(todayPosts.length)items.push({route:"content",label:`Theo dõi ${todayPosts.length} bài content hôm nay`,meta:todayPosts[0]?.title||"Content"});
-    if(posts<3)items.push({route:"content",label:"Bổ sung lịch content",meta:"Scheduled + Approved còn mỏng"});
-    if(!todayEntry.text&&!todayEntry.brainDump&&!todayEntry.win)items.push({route:"journal",label:"Ghi Daily Review",meta:"Journal hôm nay còn trống"});
-    if(balance&&balanceAge>30)items.push({route:"dashboard",label:"Kiểm tra worker balance",meta:`Balance đã ${balanceAge} phút chưa cập nhật`});
-    if(automation.tone!=="success")items.push({route:"dashboard",label:"Kiểm tra automation fanpage",meta:`Trạng thái: ${automation.label}`});
-    if(!items.length)items.push({route:"tasks",label:"Ngày đang ổn",meta:`Doanh thu ${ZL.money(stats.total)} · streak ${streak}`});
-    return items.slice(0,6);
   }
 
   function clamp(value,min,max){
@@ -453,7 +433,6 @@
     const dueToday=tasks.filter(t=>t.status!=="done"&&t.dueDate===today).length;
     const entry=(ZL.state.zak.entries||{})[today]||{};
     const doneHabits=habitsDone(today).length;
-    const items=commandItems(today,stats,posts,streak);
     return `<div class="command-shell">
       <div class="command-hero panel">
         <div>
@@ -471,15 +450,6 @@
         <button class="command-card" data-route-jump="tasks"><span>Tasks</span><strong>${dueToday}</strong><em>cần làm hôm nay</em></button>
         <button class="command-card" data-route-jump="content"><span>Content</span><strong>${posts}</strong><em>scheduled + approved</em></button>
         <button class="command-card" data-route-jump="journal"><span>Journal</span><strong>${entry.win?"Done":"Open"}</strong><em>${entry.win?"đã có win":"chưa review"}</em></button>
-      </div>
-      <div class="panel command-actions">
-        <div class="panel-title"><div><h2>Ưu tiên tiếp theo</h2><p>Tự tổng hợp từ POS, Tasks, Content, Journal</p></div></div>
-        <div class="action-list">
-          ${items.map(item=>`<button class="action-item" data-route-jump="${ZL.escape(item.route)}">
-            <span>${ZL.escape(item.label)}</span>
-            <em>${ZL.escape(item.meta||"")}</em>
-          </button>`).join("")}
-        </div>
       </div>
     </div>`;
   }
@@ -554,41 +524,6 @@
     </div>`;
   }
 
-  function drawRevenueChart(){
-    const canvas=document.getElementById("dashboardRevenueChart");
-    if(!canvas)return;
-    const box=canvas.getBoundingClientRect();
-    const ratio=window.devicePixelRatio||1;
-    canvas.width=Math.max(1,Math.floor(box.width*ratio));
-    canvas.height=Math.max(1,Math.floor(box.height*ratio));
-    const ctx=canvas.getContext("2d");
-    ctx.scale(ratio,ratio);
-    const w=box.width,h=box.height,pad=28;
-    ctx.clearRect(0,0,w,h);
-    const dates=ZL.lastDates(7);
-    const values=dates.map(d=>ZL.invoiceStats(d).total);
-    const max=Math.max(1,...values);
-    ctx.strokeStyle="rgba(255,255,255,.08)";
-    ctx.lineWidth=1;
-    for(let i=0;i<4;i++){
-      const y=pad+(h-pad*2)*i/3;
-      ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(w-pad,y);ctx.stroke();
-    }
-    const pts=values.map((v,i)=>({x:pad+(w-pad*2)*(i/(values.length-1||1)),y:h-pad-(h-pad*2)*(v/max)}));
-    const grad=ctx.createLinearGradient(0,pad,0,h-pad);
-    grad.addColorStop(0,"rgba(16,185,129,.36)");
-    grad.addColorStop(1,"rgba(16,185,129,0)");
-    ctx.beginPath();
-    pts.forEach((pt,i)=>i?ctx.lineTo(pt.x,pt.y):ctx.moveTo(pt.x,pt.y));
-    ctx.lineTo(pts[pts.length-1].x,h-pad);ctx.lineTo(pts[0].x,h-pad);ctx.closePath();
-    ctx.fillStyle=grad;ctx.fill();
-    ctx.beginPath();
-    pts.forEach((pt,i)=>i?ctx.lineTo(pt.x,pt.y):ctx.moveTo(pt.x,pt.y));
-    ctx.strokeStyle="#34d399";ctx.lineWidth=3;ctx.stroke();
-    ctx.fillStyle="#94a3b8";ctx.font="11px Inter";
-    dates.forEach((d,i)=>ctx.fillText(d.slice(5),pts[i].x-15,h-8));
-  }
-
   function bind(root){
     root.querySelectorAll("[data-note-toggle]").forEach(btn=>btn.onclick=()=>toggleNote(btn.dataset.noteToggle));
     root.querySelectorAll("[data-note-task]").forEach(btn=>btn.onclick=()=>addNoteToTask(btn.dataset.noteTask));
@@ -624,46 +559,20 @@
     const stats=ZL.invoiceStats(today);
     const posts=scheduledContentCount();
     const streak=habitStreak();
-    const alerts=[];
-    if(!stats.count)alerts.push("Monstea hôm nay chưa có đơn ghi nhận.");
-    if(posts<3)alerts.push("Lịch content còn mỏng.");
-    const approved=ZL.contentPosts().filter(p=>p.status==="approved").length;
-    if(approved)alerts.push(`${approved} bài đã approved.`);
-    const automation=automationHealth(ZL.state.automation?.monsteaFacebook);
-    if(automation.tone!=="success")alerts.push(`Automation fanpage: ${automation.label}.`);
     root.innerHTML=`
+      ${renderGlobalSearch()}
       ${renderCommandCenter(today,stats,posts,streak)}
       ${renderInsightEngine(today,stats,posts,streak)}
-      ${renderGlobalSearch()}
-      ${renderDailyReview(today,stats)}
-      <div class="grid grid-4">
-        <div class="stat-card"><div class="stat-label">Doanh thu hôm nay</div><div class="stat-value accent-value">${ZL.money(stats.total)}</div><div class="stat-note">${today}</div></div>
-        <div class="stat-card"><div class="stat-label">Số đơn</div><div class="stat-value">${stats.count}</div><div class="stat-note">Không tính nội bộ</div></div>
-        <div class="stat-card"><div class="stat-label">Content chờ lịch</div><div class="stat-value warning-value">${posts}</div><div class="stat-note">Scheduled + Approved</div></div>
-        <div class="stat-card"><div class="stat-label">Habit streak</div><div class="stat-value blue-value">${streak}</div><div class="stat-note">Ngày liên tiếp</div></div>
-      </div>
-      ${renderWalletBalance()}
-      ${renderAutomationMonitoring()}
       <div class="layout-2 dashboard-main" style="margin-top:16px">
-        <div class="panel">
-          <div class="panel-title">
-            <div><h2>Doanh thu 7 ngày</h2><p>Theo dữ liệu POS</p></div>
-            <span class="badge success">Realtime</span>
-          </div>
-          <div class="chart-wrap"><canvas id="dashboardRevenueChart"></canvas></div>
-        </div>
         ${renderMonsteaToday()}
+        <div class="panel"><div class="panel-title"><div><h2>Nana messages</h2><p>Nhắc việc và tín hiệu gần đây.</p></div></div>${renderNanaMessages()}</div>
       </div>
-      <div class="grid grid-3" style="margin-top:16px">
-        <div class="panel"><div class="panel-title"><div><h2>Việc cần chú ý</h2></div></div>${alerts.length?alerts.map(a=>`<div class="note-row"><div class="item-title">${ZL.escape(a)}</div></div>`).join(""):`<div class="empty">Không có cảnh báo lớn</div>`}</div>
-        <div class="panel"><div class="panel-title"><div><h2>AI Team</h2></div></div>${renderAgents()}</div>
-        <div class="panel"><div class="panel-title"><div><h2>Nana messages</h2></div></div>${renderNanaMessages()}</div>
-      </div>`;
+      ${renderAutomationMonitoring()}
+      ${renderDailyReview(today,stats)}
+      ${renderWalletBalance()}`;
     bind(root);
-    requestAnimationFrame(drawRevenueChart);
   }
 
   ZL.modules.dashboard={render};
   ["dashboard","pos","content","agents","nana","zak","wallet","automation"].forEach(evt=>ZL.on(evt,render));
-  window.addEventListener("resize",()=>{if(ZL.state.route==="dashboard")drawRevenueChart();});
 })();

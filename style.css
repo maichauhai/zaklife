@@ -198,6 +198,8 @@ canvas{width:100%;height:100%;display:block}
   margin-top:10px;border:1px solid rgba(248,113,113,.28);border-radius:10px;
   background:rgba(248,113,113,.08);color:var(--danger);padding:9px 10px;font-size:.78rem;overflow-wrap:anywhere
 }
+.automation-team{margin-top:14px;border-top:1px solid rgba(255,255,255,.07);padding-top:14px}
+.agent-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .command-shell{display:grid;gap:14px;margin-bottom:16px}
 .command-hero{
   display:flex;align-items:center;justify-content:space-between;gap:18px;
@@ -303,6 +305,19 @@ canvas{width:100%;height:100%;display:block}
 .details-block summary{cursor:pointer;font-weight:800;color:var(--text-secondary);font-size:.86rem;margin-bottom:10px}
 .cashflow-cards{grid-template-columns:repeat(4,minmax(150px,1fr))}
 .cashflow-cards .wide{grid-column:span 2}
+.pos-revenue-summary{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px
+}
+.pos-revenue-summary div{
+  border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.025);padding:12px;min-width:0
+}
+.pos-revenue-summary span{
+  display:block;color:var(--text-muted);font-size:.7rem;font-weight:900;text-transform:uppercase
+}
+.pos-revenue-summary strong{
+  display:block;margin-top:7px;font-size:1rem;overflow-wrap:anywhere;font-variant-numeric:tabular-nums
+}
+.pos-revenue-chart{height:260px}
 .monstea-today{border-color:rgba(245,158,11,.28)}
 .monstea-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
 .monstea-line strong{font-size:1.5rem}
@@ -734,6 +749,7 @@ body.light{
   .layout-2,.calendar-shell,.journal-write-grid,.habit-layout,.content-layout,.tasks-layout{grid-template-columns:1fr}
   .wellbeing-grid{grid-template-columns:1fr}
   .cashflow-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pos-revenue-summary,.agent-list{grid-template-columns:repeat(2,minmax(0,1fr))}
   .command-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .action-list{grid-template-columns:1fr}
   .insight-grid,.insight-body{grid-template-columns:1fr}
@@ -767,6 +783,7 @@ body.light{
   .wallet-row{display:grid}
   .wallet-row-value{justify-content:flex-start}
   .automation-summary{grid-template-columns:1fr}
+  .pos-revenue-summary,.agent-list{grid-template-columns:1fr}
   .cashflow-cards{grid-template-columns:1fr}
   .command-hero{display:grid}
   .command-score{text-align:left;min-width:0}

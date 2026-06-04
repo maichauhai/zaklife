@@ -266,11 +266,48 @@
     return `Hôm nay anh đã hoàn thành:\n\n${parts.map(p=>"- "+p).join("\n")}`;
   }
 
+  function normalizeWinLine(value){
+    return String(value||"")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g,"")
+      .replace(/[^a-z0-9]+/g," ")
+      .trim();
+  }
+
+  function newWinSuggestionLines(current,suggestion){
+    const seen=new Set(String(current||"").split(/\r?\n/).map(normalizeWinLine).filter(Boolean));
+    const header=normalizeWinLine("Hôm nay anh đã hoàn thành:");
+    const lines=[];
+    String(suggestion||"").split(/\r?\n/).forEach(raw=>{
+      const line=raw.trim();
+      if(!line){
+        if(lines.length&&lines[lines.length-1]!=="")lines.push("");
+        return;
+      }
+      const key=normalizeWinLine(line);
+      if(!key||seen.has(key))return;
+      lines.push(line);
+      seen.add(key);
+    });
+    while(lines[0]==="")lines.shift();
+    while(lines[lines.length-1]==="")lines.pop();
+    const nonBlank=lines.filter(Boolean);
+    if(nonBlank.length===1&&normalizeWinLine(nonBlank[0])===header)return "";
+    return lines.join("\n").replace(/\n{3,}/g,"\n\n").trim();
+  }
+
   function fillWinSuggestion(){
     const el=document.getElementById("winOfDay");
     if(!el)return;
     const suggestion=buildWinSuggestion();
-    el.value=el.value.trim()?`${el.value.trim()}\n\n${suggestion}`:suggestion;
+    const current=el.value.trim();
+    const addition=newWinSuggestionLines(current,suggestion);
+    if(!addition){
+      ZL.toast("Chưa có gợi ý mới để thêm");
+      return;
+    }
+    el.value=current?`${current}\n\n${addition}`:addition;
     queueJournalSave();
   }
 

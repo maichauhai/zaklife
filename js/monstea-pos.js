@@ -3,6 +3,7 @@
   let selectedDate=ZL.today();
   let selectedDateTouched=false;
   let cashRange="all";
+  let revenueRange="7d";
 
   function activeItems(value){
     return ZL.normalizeList(value).filter(item=>!item._deleted);
@@ -261,6 +262,89 @@
     return {range,sales,ingredientCost,labor,purchasesCost,otherExpenses,salaryPaidForPeriod,salaryPaidCashOut,salaryRemaining,cashOutPaid,cashNet,netProfit,netAfterPayables,dailyRows};
   }
 
+  function revenueRangeDays(){
+    return {"7d":7,"1m":31,"3m":92,"1y":365}[revenueRange]||7;
+  }
+
+  function revenueRangeLabel(){
+    return {"7d":"7 ngày","1m":"1 tháng","3m":"3 tháng","1y":"1 năm"}[revenueRange]||"7 ngày";
+  }
+
+  function revenueSeries(){
+    return recentDates(revenueRangeDays()).map(date=>{
+      const stats=ZL.invoiceStats(date);
+      return {date,total:stats.total,count:stats.count};
+    });
+  }
+
+  function renderRevenueTrend(){
+    const series=revenueSeries();
+    const total=series.reduce((sum,row)=>sum+row.total,0);
+    const orders=series.reduce((sum,row)=>sum+row.count,0);
+    const activeDays=series.filter(row=>row.total||row.count).length;
+    const avg=activeDays?Math.round(total/activeDays):0;
+    const labels={"7d":"7 ngày","1m":"1 tháng","3m":"3 tháng","1y":"1 năm"};
+    return `<div class="panel pos-revenue-panel" style="margin-top:16px">
+      <div class="panel-title">
+        <div><h2>Doanh thu theo thời gian</h2><p>Theo cùng nguồn tổng hợp Monstea POS.</p></div>
+        <div class="segmented">
+          ${Object.keys(labels).map(key=>`<button class="${revenueRange===key?"active":""}" data-pos-revenue-range="${key}">${labels[key]}</button>`).join("")}
+        </div>
+      </div>
+      <div class="pos-revenue-summary">
+        <div><span>Kỳ</span><strong>${revenueRangeLabel()}</strong></div>
+        <div><span>Doanh thu</span><strong class="accent-value">${ZL.money(total)}</strong></div>
+        <div><span>Số đơn</span><strong>${orders}</strong></div>
+        <div><span>TB/ngày có bán</span><strong class="blue-value">${ZL.money(avg)}</strong></div>
+      </div>
+      <div class="chart-wrap pos-revenue-chart"><canvas id="posRevenueChart"></canvas></div>
+    </div>`;
+  }
+
+  function drawPosRevenueChart(){
+    const canvas=document.getElementById("posRevenueChart");
+    if(!canvas)return;
+    const box=canvas.getBoundingClientRect();
+    const ratio=window.devicePixelRatio||1;
+    canvas.width=Math.max(1,Math.floor(box.width*ratio));
+    canvas.height=Math.max(1,Math.floor(box.height*ratio));
+    const ctx=canvas.getContext("2d");
+    ctx.setTransform(ratio,0,0,ratio,0,0);
+    const w=box.width,h=box.height,pad=30;
+    ctx.clearRect(0,0,w,h);
+    const series=revenueSeries();
+    const values=series.map(row=>row.total);
+    const max=Math.max(1,...values);
+    ctx.strokeStyle="rgba(255,255,255,.08)";
+    ctx.lineWidth=1;
+    for(let i=0;i<4;i++){
+      const y=pad+(h-pad*2)*i/3;
+      ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(w-pad,y);ctx.stroke();
+    }
+    const pts=values.map((v,i)=>({x:pad+(w-pad*2)*(i/(values.length-1||1)),y:h-pad-(h-pad*2)*(v/max)}));
+    const grad=ctx.createLinearGradient(0,pad,0,h-pad);
+    grad.addColorStop(0,"rgba(16,185,129,.34)");
+    grad.addColorStop(1,"rgba(16,185,129,0)");
+    ctx.beginPath();
+    pts.forEach((pt,i)=>i?ctx.lineTo(pt.x,pt.y):ctx.moveTo(pt.x,pt.y));
+    ctx.lineTo(pts[pts.length-1].x,h-pad);ctx.lineTo(pts[0].x,h-pad);ctx.closePath();
+    ctx.fillStyle=grad;ctx.fill();
+    ctx.beginPath();
+    pts.forEach((pt,i)=>i?ctx.lineTo(pt.x,pt.y):ctx.moveTo(pt.x,pt.y));
+    ctx.strokeStyle="#34d399";ctx.lineWidth=3;ctx.stroke();
+    ctx.fillStyle="#94a3b8";ctx.font="11px Inter";
+    const step=values.length>100?Math.ceil(values.length/8):values.length>31?Math.ceil(values.length/7):values.length>14?4:1;
+    series.forEach((row,i)=>{
+      if(i%step&&i!==series.length-1)return;
+      ctx.fillText(row.date.slice(5),Math.min(w-pad-34,Math.max(pad-14,pts[i].x-15)),h-8);
+    });
+    if(!values.some(Boolean)){
+      ctx.fillStyle="#64748b";
+      ctx.font="12px Inter";
+      ctx.fillText("Chưa có doanh thu trong kỳ này",pad,pad+16);
+    }
+  }
+
   function renderCashflow(){
     const data=financialData();
     const labels={all:"Tất cả",month:"Tháng này","3m":"3 tháng","6m":"6 tháng","1y":"1 năm"};
@@ -322,6 +406,7 @@
         <div class="stat-card"><div class="stat-label">Món top</div><div class="stat-value warning-value fit-text">${ZL.escape(stats.top?.name||"Chưa có")}</div><div class="stat-note">${stats.top?stats.top.qty+" lượt bán":"--"}</div></div>
       </div>
       <div class="panel" style="margin-top:16px"><div class="item-meta">${ZL.escape(auditNote)}</div></div>
+      ${renderRevenueTrend()}
       ${renderCashflow()}
       <div class="layout-2" style="margin-top:16px">
         <div class="table-panel">
@@ -355,8 +440,14 @@
       cashRange=btn.dataset.cashRange;
       render();
     });
+    root.querySelectorAll("[data-pos-revenue-range]").forEach(btn=>btn.onclick=()=>{
+      revenueRange=btn.dataset.posRevenueRange;
+      render();
+    });
+    requestAnimationFrame(drawPosRevenueChart);
   }
 
   ZL.modules.pos={render};
   ZL.on("pos",render);
+  window.addEventListener("resize",()=>{if(ZL.state.route==="pos")drawPosRevenueChart();});
 })();
