@@ -2,8 +2,13 @@ credentials/
 **/credentials/
 *.env
 .env*
+node_modules/
+test-results/
+playwright-report/
 logs/
 **/logs/
+backups/
+**/backups/
 media/
 **/media/
 *.sqlite

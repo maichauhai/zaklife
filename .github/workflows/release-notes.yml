@@ -1,0 +1,41 @@
+name: ZakLife Release Notes
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  release-notes:
+    if: ${{ !contains(github.event.head_commit.message, 'docs: update release notes') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Update release notes
+        run: node tools/release/update-release-notes.js
+
+      - name: Commit release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- docs/RELEASES.md; then
+            echo "No release-note changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/RELEASES.md
+          git commit -m "docs: update release notes [skip ci]"
+          git push

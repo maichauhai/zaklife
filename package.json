@@ -1,0 +1,15 @@
+{
+  "name": "zaklife",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "check:js": "node --check js/app.js && node --check js/firebase-init.js && node --check js/dashboard.js && node --check js/content.js",
+    "ci:secrets": "node tools/ci/check-secrets.js",
+    "ci:schema": "node tools/ci/check-schema.js",
+    "test:smoke": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.0",
+    "http-server": "^14.1.1"
+  }
+}

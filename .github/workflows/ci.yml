@@ -27,11 +27,20 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install npm dependencies
+        run: npm ci
+
       - name: Check JavaScript syntax
         shell: bash
         run: |
           set -euo pipefail
-          find js workers -type f -name "*.js" -print0 | xargs -0 -n1 node --check
+          find js workers tools tests -type f -name "*.js" -print0 | xargs -0 -n1 node --check
+
+      - name: Secret scan
+        run: node tools/ci/check-secrets.js
+
+      - name: Schema contract check
+        run: node tools/ci/check-schema.js
 
       - name: Check Python syntax
         shell: bash
@@ -47,3 +56,9 @@ jobs:
           test -f index.html
           test -f style.css
           test -d js
+
+      - name: Install Playwright browser
+        run: npx playwright install chromium --with-deps
+
+      - name: Browser smoke test
+        run: npm run test:smoke

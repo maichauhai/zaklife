@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "firebasePaths": [
+    "state",
+    "zaklife/data",
+    "zaklife/content-calendar",
+    "zaklife/tasks",
+    "zaklife/quickdock",
+    "zaklife/agents",
+    "zaklife/automation",
+    "zaklife/nana_messages",
+    "zaklife/wallet/balances/current",
+    "zaklife/vault_encrypted"
+  ],
+  "contentPostRequiredFields": [
+    "id",
+    "title",
+    "caption",
+    "scheduledDate",
+    "scheduledTime",
+    "scheduled_at",
+    "timezone",
+    "status"
+  ],
+  "contentPostStatuses": [
+    "draft",
+    "scheduled",
+    "approved",
+    "posted",
+    "missed",
+    "failed"
+  ],
+  "automationHeartbeatFields": [
+    "name",
+    "status",
+    "last_check_at",
+    "last_result",
+    "updated_at",
+    "stale_after_minutes"
+  ],
+  "requiredStaticFiles": [
+    "index.html",
+    "style.css",
+    "js/firebase-init.js",
+    "js/dashboard.js",
+    "js/content.js"
+  ]
+}
