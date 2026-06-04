@@ -182,6 +182,11 @@
   function renderTop(){
     const frequent=frequentItems();
     const results=searchResults();
+    const action=tab==="links"
+      ?`<button class="btn primary quickdock-top-add" data-qd-add="links">+ Add Link</button>`
+      :tab==="commands"
+        ?`<button class="btn primary quickdock-top-add" data-qd-add="commands">+ Add Command</button>`
+        :`<button class="btn primary quickdock-top-add" data-qd-add="pins">+ Add Note</button>`;
     return `<div class="quickdock-top">
       <div class="quickdock-search">
         <span>⌕</span>
@@ -201,10 +206,13 @@
           <em>${ZL.escape(String(row.detail||"").slice(0,120))}</em>
         </button>`).join("")}
       </div>`:""}
-      <div class="quickdock-tabs">
-        <button class="${tab==="links"?"active":""}" data-qd-tab="links">🔗 Links</button>
-        <button class="${tab==="commands"?"active":""}" data-qd-tab="commands">📋 Commands</button>
-        <button class="${tab==="pins"?"active":""}" data-qd-tab="pins">📌 Pinboard</button>
+      <div class="quickdock-tabbar">
+        <div class="quickdock-tabs">
+          <button class="${tab==="links"?"active":""}" data-qd-tab="links">🔗 Links</button>
+          <button class="${tab==="commands"?"active":""}" data-qd-tab="commands">📋 Commands</button>
+          <button class="${tab==="pins"?"active":""}" data-qd-tab="pins">📌 Pinboard</button>
+        </div>
+        <div class="quickdock-top-actions">${action}</div>
       </div>
     </div>`;
   }
@@ -232,32 +240,30 @@
           </article>`).join(""):`<div class="empty slim">Chưa có link</div>`}
         </div>
       </section>`).join("")}
-      <button class="btn primary quickdock-add" data-qd-add="links">+ Add Link</button>
     </div>`;
   }
 
   function renderCommands(){
     const list=rows("commands").filter(matches);
-    return `<div class="command-list">
+    return `<div class="qd-command-list">
       ${list.length?list.map(cmd=>{
         const cat=COMMAND_CATEGORIES[cmd.category]||COMMAND_CATEGORIES.other;
-        return `<article class="command-card">
-          <div class="command-head">
+        return `<article class="qd-command-card">
+          <div class="qd-command-head">
             <h2>${ZL.escape(cmd.title||"Command")}</h2>
             <span style="--cmd-cat:${cat.color}">${ZL.escape(cat.label)}</span>
           </div>
-          <div class="command-code">
-            <code>${ZL.escape(cmd.command||"")}</code>
-            <button data-qd-copy="${ZL.escape(cmd.id)}">📋 Copy</button>
+          <p class="qd-command-desc">${ZL.escape(cmd.description||"Copy lệnh đã lưu.")}</p>
+          <div class="qd-command-bottom">
+            <code title="${ZL.escape(cmd.command||"")}">${ZL.escape(cmd.command||"")}</code>
+            <button data-qd-copy="${ZL.escape(cmd.id)}">Copy</button>
           </div>
-          ${cmd.description?`<p>${ZL.escape(cmd.description)}</p>`:""}
-          <div class="command-actions">
+          <div class="qd-command-actions">
             <button class="btn sm" data-qd-edit="commands:${ZL.escape(cmd.id)}">Sửa</button>
             <button class="btn sm danger" data-qd-delete="commands:${ZL.escape(cmd.id)}">Xóa</button>
           </div>
         </article>`;
       }).join(""):`<div class="empty slim">Chưa có command</div>`}
-      <button class="btn primary quickdock-add wide" data-qd-add="commands">+ Add Command</button>
     </div>`;
   }
 
@@ -276,7 +282,6 @@
           </div>
         </article>`).join(""):`<div class="empty slim">Chưa có pin</div>`}
       </div>
-      <button class="quickdock-fab" data-qd-add="pins">+ Add Note</button>
     </div>`;
   }
 
