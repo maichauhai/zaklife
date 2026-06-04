@@ -285,6 +285,107 @@
     return items.slice(0,6);
   }
 
+  function clamp(value,min,max){
+    return Math.max(min,Math.min(max,value));
+  }
+
+  function revenueTrend(today,stats){
+    const dates=ZL.lastDates(7).filter(d=>d!==today);
+    const values=dates.map(d=>ZL.invoiceStats(d).total).filter(v=>v>0);
+    const avg=values.length?values.reduce((sum,v)=>sum+v,0)/values.length:0;
+    const diff=avg?Math.round((stats.total-avg)/avg*100):0;
+    return {avg,diff};
+  }
+
+  function buildInsights(today,stats,posts,streak){
+    const tasks=taskRows();
+    const dueToday=tasks.filter(t=>t.status!=="done"&&t.dueDate===today);
+    const overdue=tasks.filter(t=>isTaskOverdue(t,today));
+    const doneToday=tasks.filter(t=>taskDoneOn(t,today));
+    const openNotes=noteRows().filter(n=>!n.done);
+    const entry=(ZL.state.zak.entries||{})[today]||{};
+    const doneHabits=habitsDone(today);
+    const habitTotal=(Array.isArray(ZL.state.zak.habits)?ZL.state.zak.habits:[]).length;
+    const todayPosts=ZL.contentPosts().filter(p=>p.scheduledDate===today&&p.status!=="posted");
+    const approved=ZL.contentPosts().filter(p=>p.status==="approved").length;
+    const balance=ZL.state.wallet?.balances;
+    const balanceAge=staleMinutes(balance?.updatedAt);
+    const trend=revenueTrend(today,stats);
+    const signals=[];
+    const actions=[];
+    let score=50;
+
+    if(stats.count){score+=15;signals.push({tone:"good",text:`POS đã có ${stats.count} đơn, doanh thu ${ZL.money(stats.total)}.`});}
+    else{score-=12;signals.push({tone:"warn",text:"POS hôm nay chưa có đơn ghi nhận."});actions.push({route:"pos",label:"Kiểm tra POS",meta:"Xác nhận dữ liệu bán hàng hôm nay"});}
+
+    if(trend.avg&&trend.diff>=20){score+=8;signals.push({tone:"good",text:`Doanh thu đang cao hơn trung bình 6 ngày gần nhất khoảng ${trend.diff}%.`});}
+    if(trend.avg&&trend.diff<=-25){score-=8;signals.push({tone:"warn",text:`Doanh thu thấp hơn trung bình 6 ngày gần nhất khoảng ${Math.abs(trend.diff)}%.`});actions.push({route:"content",label:"Kích hoạt content/ưu đãi",meta:"Dùng món bán chạy hoặc combo ngắn hạn"});}
+
+    if(overdue.length){score-=14;signals.push({tone:"danger",text:`Có ${overdue.length} task quá hạn.`});actions.push({route:"tasks",label:"Dọn task quá hạn",meta:overdue[0]?.title||"Ưu tiên việc cũ trước"});}
+    if(dueToday.length){score-=Math.min(10,dueToday.length*2);signals.push({tone:"warn",text:`Còn ${dueToday.length} task cần xử lý hôm nay.`});actions.push({route:"tasks",label:"Chốt việc hôm nay",meta:dueToday[0]?.title||"Mở Kanban"});}
+    if(doneToday.length){score+=Math.min(10,doneToday.length*3);signals.push({tone:"good",text:`Đã hoàn thành ${doneToday.length} task hôm nay.`});}
+
+    if(openNotes.length){score-=Math.min(12,openNotes.length*2);signals.push({tone:"warn",text:`Monstea còn ${openNotes.length} ghi chú vận hành đang mở.`});actions.push({route:"dashboard",label:"Xử lý ghi chú Monstea",meta:openNotes[0]?.text||"Ghi chú vận hành"});}
+    if(doneHabits.length){score+=Math.min(10,doneHabits.length*2);signals.push({tone:"good",text:`Đã tick ${doneHabits.length}/${habitTotal||doneHabits.length} habit.`});}
+    else{score-=6;actions.push({route:"journal",label:"Tick habit tối thiểu",meta:"Giữ nhịp ngày trước khi tối"});}
+
+    if(entry.win){score+=8;signals.push({tone:"good",text:"Win of the Day đã có nội dung."});}
+    else if(entry.text||entry.brainDump){score+=3;signals.push({tone:"warn",text:"Journal đã có dữ liệu nhưng Win of the Day còn trống."});actions.push({route:"journal",label:"Chốt Win of the Day",meta:"Biến dữ liệu thô thành kết luận trong ngày"});}
+    else{score-=8;actions.push({route:"journal",label:"Ghi Daily Review",meta:"Tối thiểu 3 dòng để Nana có dữ liệu phân tích"});}
+
+    if(todayPosts.length){score+=4;signals.push({tone:"good",text:`Có ${todayPosts.length} bài content trong lịch hôm nay.`});}
+    if(posts<3){score-=7;actions.push({route:"content",label:"Bổ sung lịch content",meta:"Giữ pipeline fanpage không bị rỗng"});}
+    if(approved){signals.push({tone:"good",text:`Có ${approved} bài đã approved, sẵn sàng đưa vào lịch.`});}
+
+    if(balance&&balanceAge>30){score-=5;actions.push({route:"dashboard",label:"Kiểm tra worker balance",meta:`Balance đã ${balanceAge} phút chưa cập nhật`});}
+    score=clamp(Math.round(score),0,100);
+    const status=score>=75?"Ổn định":score>=55?"Cần chú ý":"Cần xử lý";
+    const topActions=actions.length?actions.slice(0,4):[{route:"tasks",label:"Ngày đang ổn",meta:"Tiếp tục xử lý việc quan trọng nhất"}];
+    return {score,status,signals:signals.slice(0,6),actions:topActions,trend,dueToday,overdue,openNotes,doneHabits};
+  }
+
+  function renderInsightEngine(today,stats,posts,streak){
+    const insight=buildInsights(today,stats,posts,streak);
+    return `<div class="panel insight-panel" style="margin-top:16px">
+      <div class="panel-title">
+        <div><h2>Insight Engine</h2><p>Rule engine đọc POS, Tasks, Content, Journal, Habits rồi đề xuất bước tiếp theo.</p></div>
+        <span class="badge ${insight.score>=75?"success":insight.score>=55?"warning":"danger"}">V1 · ${insight.status}</span>
+      </div>
+      <div class="insight-grid">
+        <div class="insight-score-card">
+          <div class="insight-ring" style="--score:${insight.score}"><strong>${insight.score}</strong><span>/100</span></div>
+          <div>
+            <h3>${ZL.escape(insight.status)}</h3>
+            <p>${insight.trend.avg?`So với trung bình gần đây: ${insight.trend.diff>=0?"+":""}${insight.trend.diff}%`:"Chưa đủ dữ liệu xu hướng doanh thu."}</p>
+          </div>
+        </div>
+        <div class="insight-metrics">
+          <div><span>Task hôm nay</span><strong>${insight.dueToday.length}</strong></div>
+          <div><span>Quá hạn</span><strong class="${insight.overdue.length?"danger-value":""}">${insight.overdue.length}</strong></div>
+          <div><span>Ghi chú mở</span><strong>${insight.openNotes.length}</strong></div>
+          <div><span>Habit</span><strong>${insight.doneHabits.length}</strong></div>
+        </div>
+      </div>
+      <div class="insight-body">
+        <div>
+          <h3>Tín hiệu chính</h3>
+          <div class="insight-signal-list">
+            ${insight.signals.length?insight.signals.map(s=>`<div class="insight-signal ${ZL.escape(s.tone)}">${ZL.escape(s.text)}</div>`).join(""):`<div class="empty slim">Chưa có tín hiệu đủ mạnh.</div>`}
+          </div>
+        </div>
+        <div>
+          <h3>Hành động đề xuất</h3>
+          <div class="insight-action-list">
+            ${insight.actions.map(a=>`<button class="insight-action" data-route-jump="${ZL.escape(a.route)}">
+              <span>${ZL.escape(a.label)}</span>
+              <em>${ZL.escape(a.meta||"")}</em>
+            </button>`).join("")}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
   function renderCommandCenter(today,stats,posts,streak){
     const tasks=taskRows();
     const doneToday=tasks.filter(t=>taskDoneOn(t,today)).length;
@@ -469,6 +570,7 @@
     if(approved)alerts.push(`${approved} bài đã approved.`);
     root.innerHTML=`
       ${renderCommandCenter(today,stats,posts,streak)}
+      ${renderInsightEngine(today,stats,posts,streak)}
       ${renderGlobalSearch()}
       ${renderDailyReview(today,stats)}
       <div class="grid grid-4">
