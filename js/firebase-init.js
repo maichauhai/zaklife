@@ -295,7 +295,10 @@
       ZL.fb.db.ref("zaklife/vault_encrypted").on("value",snap=>{
         ZL.state.vaultEncrypted=snap.val()||null;
         const remote=ZL.state.vaultEncrypted;
-        if(remote&&remote.data&&!localStorage.getItem("zkv"))localStorage.setItem("zkv",remote.data);
+        if(remote&&remote.data&&!localStorage.getItem("zkv")){
+          localStorage.setItem("zkv",remote.data);
+          if(remote.ts)localStorage.setItem("zkv_ts",remote.ts);
+        }
         ZL.emit("vault");
       });
       return Promise.resolve(true);

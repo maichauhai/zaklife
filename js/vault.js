@@ -8,6 +8,7 @@
   let edit={type:null,index:-1};
   let timer=null;
   let linkImage="";
+  let linkImageDirty=false;
 
   function xorEncode(str){
     const key="monstea";
@@ -26,11 +27,26 @@
     }catch(e){return b64;}
   }
 
+  function tsValue(value){
+    const time=Date.parse(value||"");
+    return Number.isFinite(time)?time:0;
+  }
+
   function loadData(){
     try{
-      const remote=ZL.state.vaultEncrypted?.data;
-      const raw=localStorage.getItem("zkv")||remote;
-      if(remote&&!localStorage.getItem("zkv"))localStorage.setItem("zkv",remote);
+      const remotePack=ZL.state.vaultEncrypted||{};
+      const remote=remotePack.data||"";
+      const remoteTs=tsValue(remotePack.ts);
+      const local=localStorage.getItem("zkv")||"";
+      const localTs=tsValue(localStorage.getItem("zkv_ts"));
+      const useRemote=remote&&(!local||remoteTs>localTs);
+      const raw=useRemote?remote:(local||remote);
+      if(useRemote){
+        localStorage.setItem("zkv",remote);
+        if(remotePack.ts)localStorage.setItem("zkv_ts",remotePack.ts);
+      }else if(remote&&remote===local&&remotePack.ts&&!localStorage.getItem("zkv_ts")){
+        localStorage.setItem("zkv_ts",remotePack.ts);
+      }
       if(!raw)return {...EMPTY};
       return {...EMPTY,...JSON.parse(xorDecode(raw))};
     }catch(e){
@@ -40,9 +56,11 @@
   }
 
   function saveData(data){
+    const ts=ZL.nowIso();
     const encrypted=xorEncode(JSON.stringify({...EMPTY,...data}));
     localStorage.setItem("zkv",encrypted);
-    if(ZL.fb.db)ZL.fb.db.ref("zaklife/vault_encrypted").set({data:encrypted,ts:ZL.nowIso()});
+    localStorage.setItem("zkv_ts",ts);
+    if(ZL.fb.db)ZL.fb.db.ref("zaklife/vault_encrypted").set({data:encrypted,ts});
   }
 
   function resetTimer(){
@@ -70,6 +88,7 @@
     unlocked=false;
     edit={type:null,index:-1};
     linkImage="";
+    linkImageDirty=false;
     clearTimeout(timer);
     render();
   }
@@ -94,6 +113,7 @@
     if(!item)return;
     tab=type;
     linkImage=type==="links"?(item.image||""):"";
+    linkImageDirty=false;
     render();
     if(type==="passwords"){
       document.getElementById("vpSite").value=item.site||"";
@@ -129,11 +149,13 @@
     const url=document.getElementById("vlUrl").value.trim();
     if(!label||!url){ZL.toast("Nhập tên và URL");return;}
     const data=loadData();
-    const item={label,url,image:linkImage||""};
+    const existing=(edit.type==="links"&&edit.index>=0)?(data.links[edit.index]||{}):{};
+    const item={...existing,label,url,image:linkImageDirty?linkImage:(linkImage||existing.image||"")};
     if(edit.type==="links"&&edit.index>=0)data.links[edit.index]=item;
     else data.links.push(item);
     edit={type:null,index:-1};
     linkImage="";
+    linkImageDirty=false;
     saveData(data);
     render();
   }
@@ -163,12 +185,31 @@
         canvas.width=Math.round(img.width*ratio);
         canvas.height=Math.round(img.height*ratio);
         canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
+        const draft=currentLinkDraft();
         linkImage=canvas.toDataURL("image/jpeg",0.7);
+        linkImageDirty=true;
         render();
+        restoreLinkDraft({...draft,image:linkImage});
       };
       img.src=e.target.result;
     };
     reader.readAsDataURL(file);
+  }
+
+  function currentLinkDraft(){
+    return {
+      label:document.getElementById("vlLabel")?.value||"",
+      url:document.getElementById("vlUrl")?.value||"",
+      image:linkImage
+    };
+  }
+
+  function restoreLinkDraft(draft){
+    const label=document.getElementById("vlLabel");
+    const url=document.getElementById("vlUrl");
+    if(label)label.value=draft.label||"";
+    if(url)url.value=draft.url||"";
+    linkImage=draft.image||"";
   }
 
   function openImage(src){
@@ -263,7 +304,7 @@
       return;
     }
     document.getElementById("vaultLock").onclick=lock;
-    root.querySelectorAll("[data-vault-tab]").forEach(btn=>btn.onclick=()=>{tab=btn.dataset.vaultTab;edit={type:null,index:-1};render();});
+    root.querySelectorAll("[data-vault-tab]").forEach(btn=>btn.onclick=()=>{tab=btn.dataset.vaultTab;edit={type:null,index:-1};linkImage="";linkImageDirty=false;render();});
     const vp=document.getElementById("vpSave");if(vp)vp.onclick=savePassword;
     const vl=document.getElementById("vlSave");if(vl)vl.onclick=saveLink;
     const vn=document.getElementById("vnSave");if(vn)vn.onclick=saveNote;
@@ -296,7 +337,14 @@
       };
     }
     const removeImage=document.querySelector("[data-remove-link-image]");
-    if(removeImage)removeImage.onclick=e=>{e.preventDefault();linkImage="";render();};
+    if(removeImage)removeImage.onclick=e=>{
+      e.preventDefault();
+      const draft=currentLinkDraft();
+      linkImage="";
+      linkImageDirty=true;
+      render();
+      restoreLinkDraft({...draft,image:""});
+    };
     root.onpointerdown=resetTimer;
     root.onkeydown=resetTimer;
     root.oninput=resetTimer;

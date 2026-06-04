@@ -9,6 +9,7 @@
   ];
   let selectedDate=ZL.today();
   let calendarMonth=ZL.today().slice(0,7);
+  let saveTimer=null;
 
   function entryFor(date){
     return (ZL.state.zak.entries||{})[date]||{};
@@ -33,7 +34,52 @@
     return streak;
   }
 
+  function collectJournalEntry(){
+    const value=id=>document.getElementById(id)?.value||"";
+    const active=document.querySelector(".mood-btn.active");
+    const mood=MOODS[Number(active?.dataset.mood||2)]||MOODS[2];
+    const gratitude=[1,2,3].map(i=>value("gratitude"+i).trim()).filter(Boolean);
+    return {
+      ...entryFor(selectedDate),
+      mood:mood.score,
+      moodEmoji:mood.emoji,
+      moodLabel:mood.label,
+      energy:{
+        morning:Number(value("energyMorning"))||5,
+        afternoon:Number(value("energyAfternoon"))||5,
+        evening:Number(value("energyEvening"))||5
+      },
+      sleepQuality:Number(value("sleepQuality"))||3,
+      sleepHours:Number(value("sleepHours"))||0,
+      text:value("journalText").trim(),
+      brainDump:value("brainDump").trim(),
+      gratitude,
+      win:value("winOfDay").trim(),
+      timestamp:ZL.nowIso()
+    };
+  }
+
+  function persistJournal(options={}){
+    if(!document.getElementById("journalText"))return Promise.resolve();
+    ZL.state.zak.entries=ZL.state.zak.entries||{};
+    ZL.state.zak.entries[selectedDate]=collectJournalEntry();
+    const sync=ZL.syncZakData();
+    if(options.toast)ZL.toast("Đã lưu journal");
+    if(options.renderAfter)sync.then(render);
+    return sync;
+  }
+
+  function queueJournalSave(){
+    clearTimeout(saveTimer);
+    saveTimer=setTimeout(()=>persistJournal(),350);
+  }
+
   function saveJournal(){
+    clearTimeout(saveTimer);
+    persistJournal({toast:true,renderAfter:true});
+  }
+
+  function legacySaveJournal(){
     const active=document.querySelector(".mood-btn.active");
     const mood=MOODS[Number(active?.dataset.mood||2)];
     const gratitude=[1,2,3].map(i=>document.getElementById("gratitude"+i).value.trim()).filter(Boolean);
@@ -218,6 +264,7 @@
     if(!el)return;
     const suggestion=buildWinSuggestion();
     el.value=el.value.trim()?`${el.value.trim()}\n\n${suggestion}`:suggestion;
+    queueJournalSave();
   }
 
   function recentEntries(){
@@ -241,13 +288,16 @@
     root.querySelectorAll(".mood-btn").forEach(btn=>btn.onclick=()=>{
       root.querySelectorAll(".mood-btn").forEach(x=>x.classList.remove("active"));
       btn.classList.add("active");
+      queueJournalSave();
     });
     root.querySelectorAll(".star-btn").forEach(btn=>btn.onclick=()=>{
       document.getElementById("sleepQuality").value=btn.dataset.sleep;
       root.querySelectorAll(".star-btn").forEach(x=>x.classList.toggle("active",Number(x.dataset.sleep)<=Number(btn.dataset.sleep)));
+      queueJournalSave();
     });
     root.querySelectorAll("[data-habit-id]").forEach(btn=>btn.onclick=()=>toggleHabit(btn.dataset.habitId,selectedDate));
     root.querySelectorAll("[data-select-date]").forEach(btn=>btn.onclick=()=>{
+      persistJournal();
       selectedDate=btn.dataset.selectDate;
       calendarMonth=selectedDate.slice(0,7);
       render();
@@ -256,6 +306,11 @@
     document.getElementById("habitNextMonth").onclick=()=>shiftMonth(1);
     document.getElementById("saveJournalBtn").onclick=saveJournal;
     document.getElementById("suggestWinBtn").onclick=fillWinSuggestion;
+    root.querySelectorAll("#journalText,#brainDump,#winOfDay,#sleepHours,#gratitude1,#gratitude2,#gratitude3,#energyMorning,#energyAfternoon,#energyEvening")
+      .forEach(el=>{
+        el.oninput=queueJournalSave;
+        el.onchange=queueJournalSave;
+      });
   }
 
   function render(){
@@ -313,5 +368,11 @@
 
   ZL.modules.journal={render};
   ZL.on("zak",render);
+  ZL.on("route-change",payload=>{
+    if(payload?.from==="journal"){
+      clearTimeout(saveTimer);
+      persistJournal();
+    }
+  });
   window.addEventListener("resize",()=>{if(ZL.state.route==="journal")drawMoodMini();});
 })();

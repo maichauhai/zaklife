@@ -88,6 +88,41 @@
     writeNote(note._path,{done,doneDate:done?ZL.today():null}).then(()=>ZL.toast(done?"Đã xong ghi chú":"Đã mở lại ghi chú"));
   }
 
+  function saveDashboardTask(task){
+    if(!ZL.fb.db){
+      ZL.state.tasks=ZL.state.tasks||{};
+      ZL.state.tasks[task.id]=task;
+      ZL.emit("tasks");
+      ZL.emit("dashboard");
+      return Promise.resolve();
+    }
+    return ZL.fb.db.ref("zaklife/tasks/"+task.id).set(task);
+  }
+
+  function addNoteToTask(path){
+    const note=noteRows().find(n=>n._path===String(path));
+    if(!note)return;
+    if(note.taskId){ZL.toast("Ghi chú này đã có task");return;}
+    const id="task-monstea-note-"+Date.now();
+    const now=ZL.nowIso();
+    const task={
+      id,
+      title:String(note.text||"").trim()||"Ghi chú Monstea",
+      status:"todo",
+      category:"monstea",
+      priority:"medium",
+      dueDate:ZL.today(),
+      starred:false,
+      source:"monstea-note",
+      sourcePath:note._path,
+      createdAt:now,
+      updatedAt:now
+    };
+    saveDashboardTask(task)
+      .then(()=>writeNote(note._path,{taskId:id,taskCreatedAt:now}))
+      .then(()=>ZL.toast("Đã thêm vào To Do Monstea"));
+  }
+
   function addNote(text){
     const value=String(text||"").trim();
     if(!value){ZL.toast("Nhập nội dung ghi chú");return;}
@@ -133,11 +168,12 @@
         <button class="btn primary" id="monsteaNoteAdd">Thêm</button>
       </div>
       <div class="note-list compact">
-        ${active.length?active.map(n=>`<button class="monstea-note" data-note-toggle="${ZL.escape(n._path)}">
-          <span class="check-box"></span>
+        ${active.length?active.map(n=>`<div class="monstea-note">
+          <button class="check-box" data-note-toggle="${ZL.escape(n._path)}" title="Đánh dấu xong"></button>
           <span>${ZL.escape(n.text||"")}</span>
+          <button class="btn sm note-task-btn" data-note-task="${ZL.escape(n._path)}" ${n.taskId?"disabled":""}>${n.taskId?"Đã thêm":"+ Task"}</button>
           <time>${ZL.escape(n.time||"")}</time>
-        </button>`).join(""):`<div class="empty slim">Không có ghi chú đang mở</div>`}
+        </div>`).join(""):`<div class="empty slim">Không có ghi chú đang mở</div>`}
       </div>
     </div>`;
   }
@@ -393,6 +429,7 @@
 
   function bind(root){
     root.querySelectorAll("[data-note-toggle]").forEach(btn=>btn.onclick=()=>toggleNote(btn.dataset.noteToggle));
+    root.querySelectorAll("[data-note-task]").forEach(btn=>btn.onclick=()=>addNoteToTask(btn.dataset.noteTask));
     root.querySelectorAll("[data-route-jump]").forEach(btn=>btn.onclick=()=>ZL.switchRoute(btn.dataset.routeJump));
     const searchInput=root.querySelector("#dashboardSearchInput");
     if(searchInput){

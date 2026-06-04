@@ -240,11 +240,12 @@ canvas{width:100%;height:100%;display:block}
 .note-list.compact{display:grid;gap:4px}
 .monstea-note{
   width:100%;border:0;border-bottom:1px solid rgba(255,255,255,.05);background:transparent;color:var(--text-primary);
-  display:grid;grid-template-columns:18px minmax(0,1fr) 46px;gap:8px;align-items:center;text-align:left;padding:8px 0
+  display:grid;grid-template-columns:18px minmax(0,1fr) auto 46px;gap:8px;align-items:center;text-align:left;padding:8px 0
 }
 .monstea-note span:nth-child(2){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .monstea-note time{color:var(--text-muted);font-size:.72rem;text-align:right}
-.check-box{width:14px;height:14px;border:1px solid var(--text-muted);border-radius:3px}
+.check-box{width:14px;height:14px;border:1px solid var(--text-muted);border-radius:3px;background:transparent;padding:0;min-height:0}
+.note-task-btn{min-height:28px;padding:0 8px;white-space:nowrap;font-size:.7rem}
 .slim{padding:14px}
 .wellbeing-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 .well-card{
@@ -327,7 +328,7 @@ textarea.tall{min-height:272px}
 .vault-link-image-empty{color:var(--text-muted);font-size:.82rem}
 .vault-link-image-preview{position:relative;width:min(260px,100%);aspect-ratio:16/9}
 .vault-link-image-preview img{
-  width:100%;height:100%;object-fit:cover;border-radius:10px;border:1px solid var(--border);cursor:zoom-in
+  width:100%;height:100%;object-fit:contain;border-radius:10px;border:1px solid var(--border);cursor:zoom-in;background:rgba(5,7,12,.46)
 }
 .vault-link-image-preview button{
   position:absolute;right:-8px;top:-8px;width:26px;height:26px;border-radius:50%;
@@ -336,7 +337,7 @@ textarea.tall{min-height:272px}
 .vault-link-item{align-items:center;display:grid;grid-template-columns:132px minmax(0,1fr) auto}
 .vault-link-main{min-width:0}
 .vault-link-thumb{
-  width:132px;height:82px;object-fit:cover;border-radius:10px;border:1px solid var(--border);
+  width:132px;height:82px;object-fit:contain;border-radius:10px;border:1px solid var(--border);
   background:rgba(5,7,12,.48);cursor:zoom-in
 }
 .vault-link-thumb.placeholder{
