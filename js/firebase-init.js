@@ -132,10 +132,12 @@
   };
 
   function normalizeHabit(h){
+    const habit=h&&typeof h==="object"?h:{};
+    const {cycle,...rest}=habit;
     return {
-      ...h,
-      name:String(h?.name||"").trim(),
-      cycleDays:Math.max(1,Number(h?.cycle??h?.cycleDays)||1)
+      ...rest,
+      name:String(habit.name||"").trim(),
+      cycleDays:Math.max(1,Number(habit.cycleDays??cycle)||1)
     };
   }
 

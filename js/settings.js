@@ -49,6 +49,7 @@
     const h=(ZL.state.zak.habits||[]).find(x=>String(x.id)===String(id));
     if(!h)return;
     h.cycleDays=Math.max(1,Number(value)||1);
+    delete h.cycle;
     ZL.syncZakData({replaceHabits:true});
   }
 

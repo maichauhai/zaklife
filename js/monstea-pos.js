@@ -52,6 +52,15 @@
     return out;
   }
 
+  function formatCompactMoney(value){
+    const n=Math.round(Number(value)||0);
+    const abs=Math.abs(n);
+    if(abs>=1000000000)return `${(n/1000000000).toFixed(abs>=10000000000?0:1).replace(/\.0$/,"")} tỷ`;
+    if(abs>=1000000)return `${(n/1000000).toFixed(abs>=10000000?0:1).replace(/\.0$/,"")}tr`;
+    if(abs>=1000)return `${Math.round(n/1000)}k`;
+    return `${n}đ`;
+  }
+
   function allFinancialDates(){
     const pos=ZL.state.pos||{};
     const keys=new Set(Object.keys(pos.history||{}));
@@ -284,6 +293,7 @@
     const activeDays=series.filter(row=>row.total||row.count).length;
     const avg=activeDays?Math.round(total/activeDays):0;
     const labels={"7d":"7 ngày","1m":"1 tháng","3m":"3 tháng","1y":"1 năm"};
+    const dailyRows=series.filter(row=>row.total||row.count).slice().reverse();
     return `<div class="panel pos-revenue-panel" style="margin-top:16px">
       <div class="panel-title">
         <div><h2>Doanh thu theo thời gian</h2><p>Theo cùng nguồn tổng hợp Monstea POS.</p></div>
@@ -298,6 +308,16 @@
         <div><span>TB/ngày có bán</span><strong class="blue-value">${ZL.money(avg)}</strong></div>
       </div>
       <div class="chart-wrap pos-revenue-chart"><canvas id="posRevenueChart"></canvas></div>
+      <details class="details-block revenue-daily-details">
+        <summary>Doanh thu từng ngày</summary>
+        <div class="revenue-daily-list">
+          ${dailyRows.length?dailyRows.map(row=>`<div class="revenue-daily-row">
+            <span>${row.date}</span>
+            <span>${row.count} đơn</span>
+            <strong>${ZL.money(row.total)}</strong>
+          </div>`).join(""):`<div class="empty">Chưa có doanh thu trong kỳ này</div>`}
+        </div>
+      </details>
     </div>`;
   }
 
@@ -310,38 +330,66 @@
     canvas.height=Math.max(1,Math.floor(box.height*ratio));
     const ctx=canvas.getContext("2d");
     ctx.setTransform(ratio,0,0,ratio,0,0);
-    const w=box.width,h=box.height,pad=30;
+    const w=box.width,h=box.height;
+    const pad={top:22,right:28,bottom:30,left:58};
+    const plotW=Math.max(1,w-pad.left-pad.right);
+    const plotH=Math.max(1,h-pad.top-pad.bottom);
     ctx.clearRect(0,0,w,h);
     const series=revenueSeries();
     const values=series.map(row=>row.total);
     const max=Math.max(1,...values);
+    const yFor=value=>pad.top+plotH-(plotH*(value/max));
+    const xFor=index=>pad.left+plotW*(index/(values.length-1||1));
     ctx.strokeStyle="rgba(255,255,255,.08)";
     ctx.lineWidth=1;
     for(let i=0;i<4;i++){
-      const y=pad+(h-pad*2)*i/3;
-      ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(w-pad,y);ctx.stroke();
+      const ratio=i/3;
+      const y=pad.top+plotH*ratio;
+      const tick=max*(1-ratio);
+      ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(w-pad.right,y);ctx.stroke();
+      ctx.fillStyle="#64748b";
+      ctx.font="11px Inter";
+      ctx.textAlign="right";
+      ctx.fillText(formatCompactMoney(tick),pad.left-8,y+4);
     }
-    const pts=values.map((v,i)=>({x:pad+(w-pad*2)*(i/(values.length-1||1)),y:h-pad-(h-pad*2)*(v/max)}));
-    const grad=ctx.createLinearGradient(0,pad,0,h-pad);
+    const columnStep=plotW/Math.max(1,values.length);
+    const barW=Math.max(2,Math.min(26,columnStep*.62));
+    values.forEach((value,i)=>{
+      const x=xFor(i);
+      const y=yFor(value);
+      const bottom=pad.top+plotH;
+      ctx.fillStyle=value?"rgba(96,165,250,.28)":"rgba(148,163,184,.08)";
+      ctx.fillRect(x-barW/2,y,barW,Math.max(1,bottom-y));
+      if(value&&values.length<=31){
+        ctx.fillStyle="#bfdbfe";
+        ctx.font="10px Inter";
+        ctx.textAlign="center";
+        ctx.fillText(formatCompactMoney(value),x,Math.max(pad.top+10,y-6));
+      }
+    });
+    const pts=values.map((v,i)=>({x:xFor(i),y:yFor(v)}));
+    const grad=ctx.createLinearGradient(0,pad.top,0,h-pad.bottom);
     grad.addColorStop(0,"rgba(16,185,129,.34)");
     grad.addColorStop(1,"rgba(16,185,129,0)");
     ctx.beginPath();
     pts.forEach((pt,i)=>i?ctx.lineTo(pt.x,pt.y):ctx.moveTo(pt.x,pt.y));
-    ctx.lineTo(pts[pts.length-1].x,h-pad);ctx.lineTo(pts[0].x,h-pad);ctx.closePath();
+    ctx.lineTo(pts[pts.length-1].x,pad.top+plotH);ctx.lineTo(pts[0].x,pad.top+plotH);ctx.closePath();
     ctx.fillStyle=grad;ctx.fill();
     ctx.beginPath();
     pts.forEach((pt,i)=>i?ctx.lineTo(pt.x,pt.y):ctx.moveTo(pt.x,pt.y));
     ctx.strokeStyle="#34d399";ctx.lineWidth=3;ctx.stroke();
     ctx.fillStyle="#94a3b8";ctx.font="11px Inter";
+    ctx.textAlign="left";
     const step=values.length>100?Math.ceil(values.length/8):values.length>31?Math.ceil(values.length/7):values.length>14?4:1;
     series.forEach((row,i)=>{
       if(i%step&&i!==series.length-1)return;
-      ctx.fillText(row.date.slice(5),Math.min(w-pad-34,Math.max(pad-14,pts[i].x-15)),h-8);
+      ctx.fillText(row.date.slice(5),Math.min(w-pad.right-34,Math.max(pad.left-14,pts[i].x-15)),h-8);
     });
     if(!values.some(Boolean)){
       ctx.fillStyle="#64748b";
       ctx.font="12px Inter";
-      ctx.fillText("Chưa có doanh thu trong kỳ này",pad,pad+16);
+      ctx.textAlign="left";
+      ctx.fillText("Chưa có doanh thu trong kỳ này",pad.left,pad.top+16);
     }
   }
 
