@@ -61,7 +61,16 @@ button{cursor:pointer}
   border-color:rgba(16,185,129,.25);box-shadow:0 0 22px rgba(16,185,129,.09);
 }
 .nav-item.active::before{content:"";width:3px;height:22px;border-radius:3px;background:var(--accent);margin-left:-5px}
+.nav-item[draggable="true"]{cursor:grab}
+.nav-item[draggable="true"]:active{cursor:grabbing}
+.nav-item.dragging{opacity:.45;transform:scale(.99)}
+.nav-item.drag-over{background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.42)}
+.nav-grip{
+  color:var(--text-muted);font-size:.76rem;line-height:1;letter-spacing:-.12em;opacity:.48;margin-right:-4px;
+}
+.nav-item:hover .nav-grip,.nav-item.dragging .nav-grip{color:var(--accent-light);opacity:1}
 .nav-icon{width:22px;text-align:center;color:var(--accent-light)}
+.nav-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sidebar-footer{margin-top:auto}
 .sync-pill,.date-chip,.user-chip{
   display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:999px;
@@ -465,6 +474,11 @@ textarea.tall{min-height:272px}
 .pin-actions{display:flex;gap:8px;margin-top:12px}
 .qd-modal{position:fixed;inset:0;z-index:2700;background:rgba(0,0,0,.68);display:grid;place-items:center;padding:18px}
 .qd-modal-card{width:min(560px,94vw);background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
+.qd-category-row{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:8px;align-items:center}
+.qd-category-add{height:44px}
+.qd-category-new{margin:-2px 0 12px;border:1px dashed rgba(255,255,255,.12);border-radius:12px;padding:10px;background:rgba(5,7,12,.24)}
+.qd-category-fields{display:grid;grid-template-columns:74px minmax(0,1fr) auto;gap:8px;align-items:center}
+.qd-category-fields input{min-height:38px;padding:8px 10px}
 .pin-color-row{display:flex;gap:8px;margin:8px 0 16px}
 .pin-color-row button{width:34px;height:34px;border-radius:999px;border:2px solid transparent;background:var(--pin-color)}
 .pin-color-row button.active{border-color:white;box-shadow:0 0 0 3px rgba(255,255,255,.12)}
@@ -754,5 +768,7 @@ body.light{
   .task-board{grid-template-columns:repeat(3,260px)}
   .bookmark-grid,.quickdock-results{grid-template-columns:1fr}
   .qd-command-list{grid-template-columns:1fr}
+  .qd-category-fields{grid-template-columns:56px minmax(0,1fr)}
+  .qd-category-fields .btn{grid-column:1/-1}
   .quickdock-tabbar{align-items:flex-start}
 }

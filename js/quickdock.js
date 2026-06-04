@@ -60,6 +60,46 @@
     return ZL.state.quickdock||{};
   }
 
+  function linkCategories(){
+    const custom=qd().linkCategories||{};
+    return Object.entries(custom).reduce((all,[id,cat])=>{
+      if(cat&&!cat._deleted)all[id]={label:cat.label||id,icon:cat.icon||"🔖"};
+      return all;
+    },{...LINK_CATEGORIES});
+  }
+
+  function categorySlug(label){
+    const slug=String(label||"")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g,"")
+      .replace(/đ/g,"d")
+      .replace(/[^a-z0-9]+/g,"-")
+      .replace(/^-+|-+$/g,"")
+      .slice(0,36);
+    return slug||("cat-"+Date.now());
+  }
+
+  function uniqueCategoryId(label){
+    const base=categorySlug(label);
+    const cats=linkCategories();
+    return cats[base]?`${base}-${Date.now().toString(36)}`:base;
+  }
+
+  function saveLinkCategory(category){
+    const payload={...category,updatedAt:ZL.nowIso()};
+    if(!payload.createdAt)payload.createdAt=ZL.nowIso();
+    if(!ZL.fb.db){
+      ZL.state.quickdock=ZL.state.quickdock||{};
+      ZL.state.quickdock.linkCategories=ZL.state.quickdock.linkCategories||{};
+      ZL.state.quickdock.linkCategories[payload.id]=payload;
+      ZL.emit("quickdock");
+      return Promise.resolve(payload);
+    }
+    return itemRef("linkCategories",payload.id).set(payload).then(()=>payload);
+  }
+
   function defaults(type){
     if(type==="links")return DEFAULT_LINKS;
     if(type==="commands")return DEFAULT_COMMANDS;
@@ -218,14 +258,15 @@
   }
 
   function renderLinks(){
-    const grouped={dev:[],monstea:[],trading:[],personal:[]};
+    const categories=linkCategories();
+    const grouped=Object.fromEntries(Object.keys(categories).map(key=>[key,[]]));
     rows("links").filter(matches).forEach(item=>{
       const key=grouped[item.category]?item.category:"personal";
       grouped[key].push(item);
     });
     return `<div class="quickdock-section">
-      ${Object.entries(LINK_CATEGORIES).map(([key,cat])=>`<section class="bookmark-group">
-        <h2>${cat.icon} ${cat.label}</h2>
+      ${Object.entries(categories).map(([key,cat])=>`<section class="bookmark-group">
+        <h2>${ZL.escape(cat.icon)} ${ZL.escape(cat.label)}</h2>
         <div class="bookmark-grid">
           ${grouped[key].length?grouped[key].map(link=>`<article class="bookmark-card" data-qd-run="links:${ZL.escape(link.id)}">
             <img src="${favicon(link.url)}" alt="">
@@ -294,13 +335,27 @@
 
   function renderModal(){
     if(!modal)return "";
-    const item=modal.item||{};
+    const item={...(modal.item||{}),...(modal.draft||{})};
     if(modal.type==="links"){
+      const categories=linkCategories();
+      const selectedCategory=item.category||modal.linkCategory||"personal";
       return `<div class="qd-modal"><div class="qd-modal-card">
         <div class="panel-title"><div><h2>${modalTitle()}</h2></div><button class="icon-btn" id="qdCloseModal">×</button></div>
         <div class="field compact"><label>Name</label><input id="qdLinkName" value="${ZL.escape(item.name||"")}"></div>
         <div class="field compact"><label>URL</label><input id="qdLinkUrl" value="${ZL.escape(item.url||"")}"></div>
-        <div class="field compact"><label>Category</label><select id="qdLinkCategory">${Object.entries(LINK_CATEGORIES).map(([key,cat])=>`<option value="${key}" ${(item.category||"personal")===key?"selected":""}>${cat.icon} ${cat.label}</option>`).join("")}</select></div>
+        <div class="field compact"><label>Category</label>
+          <div class="qd-category-row">
+            <select id="qdLinkCategory">${Object.entries(categories).map(([key,cat])=>`<option value="${key}" ${selectedCategory===key?"selected":""}>${ZL.escape(cat.icon)} ${ZL.escape(cat.label)}</option>`).join("")}</select>
+            <button class="icon-btn qd-category-add" id="qdShowCategory" title="Thêm category">+</button>
+          </div>
+        </div>
+        <div class="qd-category-new" id="qdCategoryNew" hidden>
+          <div class="qd-category-fields">
+            <input id="qdNewCategoryIcon" maxlength="8" placeholder="Icon">
+            <input id="qdNewCategoryName" placeholder="Tên category mới">
+            <button class="btn sm primary" id="qdSaveCategory">Thêm</button>
+          </div>
+        </div>
         <button class="btn primary" id="qdSaveModal">Lưu</button>
       </div></div>`;
     }
@@ -351,6 +406,30 @@
     });
   }
 
+  function captureLinkDraft(){
+    if(!modal||modal.type!=="links")return;
+    modal.draft={
+      name:document.getElementById("qdLinkName")?.value||"",
+      url:document.getElementById("qdLinkUrl")?.value||"",
+      category:document.getElementById("qdLinkCategory")?.value||modal.linkCategory||"personal"
+    };
+  }
+
+  function saveNewCategory(){
+    if(!modal||modal.type!=="links")return;
+    const label=document.getElementById("qdNewCategoryName")?.value.trim()||"";
+    const icon=(document.getElementById("qdNewCategoryIcon")?.value.trim()||"🔖").slice(0,8);
+    if(!label){ZL.toast("Nhập tên category");return;}
+    captureLinkDraft();
+    const payload={id:uniqueCategoryId(label),label,icon};
+    modal.linkCategory=payload.id;
+    modal.draft={...(modal.draft||{}),category:payload.id};
+    saveLinkCategory(payload).then(()=>{
+      ZL.toast("Đã thêm category");
+      render();
+    });
+  }
+
   function bind(root){
     const search=root.querySelector("#qdSearch");
     if(search){
@@ -389,6 +468,14 @@
     if(close)close.onclick=()=>{modal=null;render();};
     const save=root.querySelector("#qdSaveModal");
     if(save)save.onclick=saveModal;
+    const showCategory=root.querySelector("#qdShowCategory");
+    if(showCategory)showCategory.onclick=()=>{
+      const box=root.querySelector("#qdCategoryNew");
+      if(box)box.hidden=!box.hidden;
+      if(!box?.hidden)root.querySelector("#qdNewCategoryIcon")?.focus();
+    };
+    const saveCategory=root.querySelector("#qdSaveCategory");
+    if(saveCategory)saveCategory.onclick=saveNewCategory;
   }
 
   function render(){

@@ -11,6 +11,9 @@
     quickdock:{title:"Quick Dock",subtitle:"Link, lệnh và ghi chú nhanh"},
     settings:{title:"Settings",subtitle:"Cấu hình"}
   };
+  const NAV_ORDER_KEY="zaklifeNavOrder";
+  let navMeta=null;
+  let draggedRoute="";
 
   function setDate(){
     const el=document.getElementById("currentDate");
@@ -20,6 +23,96 @@
   function routeFromHash(){
     const hash=location.hash.replace("#","");
     return ROUTES[hash]?hash:"dashboard";
+  }
+
+  function readNavMeta(){
+    if(navMeta)return navMeta;
+    const nav=document.querySelector(".nav-group");
+    navMeta={};
+    let section="";
+    nav?.querySelectorAll(".nav-section,.nav-item").forEach(el=>{
+      if(el.classList.contains("nav-section")){
+        section=el.textContent.trim();
+        return;
+      }
+      const route=el.dataset.route;
+      if(!route||!ROUTES[route])return;
+      navMeta[route]={html:el.innerHTML,section};
+    });
+    return navMeta;
+  }
+
+  function getNavOrder(){
+    const meta=readNavMeta();
+    const defaults=Object.keys(meta);
+    try{
+      const saved=JSON.parse(localStorage.getItem(NAV_ORDER_KEY)||"[]");
+      const valid=Array.isArray(saved)?saved.filter(route=>meta[route]):[];
+      defaults.forEach(route=>{if(!valid.includes(route))valid.push(route);});
+      return valid;
+    }catch(e){
+      return defaults;
+    }
+  }
+
+  function saveNavOrder(order){
+    localStorage.setItem(NAV_ORDER_KEY,JSON.stringify(order));
+  }
+
+  function moveNavItem(sourceRoute,targetRoute,placeAfter){
+    if(!sourceRoute||!targetRoute||sourceRoute===targetRoute)return;
+    const order=getNavOrder().filter(route=>route!==sourceRoute);
+    const targetIndex=order.indexOf(targetRoute);
+    if(targetIndex<0)return;
+    order.splice(targetIndex+(placeAfter?1:0),0,sourceRoute);
+    saveNavOrder(order);
+    renderNav();
+  }
+
+  function bindNavItems(){
+    document.querySelectorAll(".nav-item").forEach(btn=>{
+      btn.addEventListener("click",()=>renderRoute(btn.dataset.route));
+      btn.addEventListener("dragstart",e=>{
+        draggedRoute=btn.dataset.route;
+        btn.classList.add("dragging");
+        e.dataTransfer.effectAllowed="move";
+        e.dataTransfer.setData("text/plain",draggedRoute);
+      });
+      btn.addEventListener("dragover",e=>{
+        e.preventDefault();
+        btn.classList.add("drag-over");
+        e.dataTransfer.dropEffect="move";
+      });
+      btn.addEventListener("dragleave",()=>btn.classList.remove("drag-over"));
+      btn.addEventListener("drop",e=>{
+        e.preventDefault();
+        btn.classList.remove("drag-over");
+        const rect=btn.getBoundingClientRect();
+        const placeAfter=e.clientY>rect.top+rect.height/2;
+        moveNavItem(e.dataTransfer.getData("text/plain")||draggedRoute,btn.dataset.route,placeAfter);
+      });
+      btn.addEventListener("dragend",()=>{
+        draggedRoute="";
+        document.querySelectorAll(".nav-item").forEach(item=>item.classList.remove("dragging","drag-over"));
+      });
+    });
+  }
+
+  function renderNav(){
+    const nav=document.querySelector(".nav-group");
+    if(!nav)return;
+    const meta=readNavMeta();
+    const activeRoute=ZL.state.route||routeFromHash();
+    let currentSection="";
+    nav.innerHTML=getNavOrder().map(route=>{
+      const item=meta[route];
+      if(!item)return"";
+      const section=item.section||"";
+      const heading=section&&section!==currentSection?`<div class="nav-section">${section}</div>`:"";
+      currentSection=section;
+      return `${heading}<button class="nav-item ${activeRoute===route?"active":""}" data-route="${route}" draggable="true"><span class="nav-grip" aria-hidden="true">⋮⋮</span>${item.html}</button>`;
+    }).join("");
+    bindNavItems();
   }
 
   function renderRoute(route,updateHash=true){
@@ -39,7 +132,7 @@
   ZL.switchRoute=renderRoute;
 
   function initNav(){
-    document.querySelectorAll(".nav-item").forEach(btn=>btn.addEventListener("click",()=>renderRoute(btn.dataset.route)));
+    renderNav();
     document.getElementById("menuToggle").addEventListener("click",()=>document.getElementById("sidebar").classList.toggle("open"));
     document.addEventListener("click",e=>{
       const sidebar=document.getElementById("sidebar");
