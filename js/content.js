@@ -47,7 +47,11 @@
   }
 
   function statusText(status){
-    return ({draft:"Draft",scheduled:"Scheduled",approved:"Approved",posted:"Posted"})[status]||status||"Draft";
+    return ({draft:"Draft",scheduled:"Scheduled",approved:"Approved",posted:"Posted",missed:"Missed",failed:"Failed"})[status]||status||"Draft";
+  }
+
+  function scheduledIso(date,time){
+    return `${date}T${time}:00+07:00`;
   }
 
   function mediaStatusText(status){
@@ -209,7 +213,7 @@
         <div class="field"><label>Time</label><input type="time" id="contentTime" value="${ZL.escape(post.scheduledTime)}"></div>
       </div>
       <div class="field"><label>Status</label><select id="contentStatus">
-        ${["draft","scheduled","approved","posted"].map(s=>`<option value="${s}" ${post.status===s?"selected":""}>${statusText(s)}</option>`).join("")}
+        ${["draft","scheduled","approved","posted","missed","failed"].map(s=>`<option value="${s}" ${post.status===s?"selected":""}>${statusText(s)}</option>`).join("")}
       </select></div>
       <div class="grid grid-2">
         <button class="btn primary" id="saveContentBtn">${post.id?"Lưu bài":"Schedule Post"}</button>
@@ -279,7 +283,8 @@
       storagePath,thumbUrl,thumbStoragePath,
       mediaStatus,mediaMime,mediaSize,mediaProvider,driveFileId,deleteOriginalAfterPost,
       scheduledDate,scheduledTime,
-      scheduled_at:`${scheduledDate}T${scheduledTime}:00`,
+      scheduled_at:scheduledIso(scheduledDate,scheduledTime),
+      timezone:"Asia/Ho_Chi_Minh",
       status,updated_at:ZL.nowIso()
     };
   }

@@ -1,0 +1,12 @@
+credentials/
+**/credentials/
+*.env
+.env*
+logs/
+**/logs/
+media/
+**/media/
+*.sqlite
+*.sqlite-*
+__pycache__/
+*.pyc
