@@ -33,7 +33,7 @@
     iconPickerOpen=false;
     pendingHabitName="";
     pendingHabitCycle=1;
-    ZL.syncZakData();
+    ZL.syncZakData({replaceHabits:true});
     ZL.toast("Đã thêm habit");
     render();
   }
@@ -41,7 +41,7 @@
   function removeHabit(id){
     if(!confirm("Xóa habit này? Dữ liệu log cũ vẫn giữ trong ngày đã ghi."))return;
     ZL.state.zak.habits=(ZL.state.zak.habits||[]).filter(h=>String(h.id)!==String(id));
-    ZL.syncZakData();
+    ZL.syncZakData({replaceHabits:true});
     render();
   }
 
@@ -49,14 +49,14 @@
     const h=(ZL.state.zak.habits||[]).find(x=>String(x.id)===String(id));
     if(!h)return;
     h.cycleDays=Math.max(1,Number(value)||1);
-    ZL.syncZakData();
+    ZL.syncZakData({replaceHabits:true});
   }
 
   function updateIcon(id,icon){
     const h=(ZL.state.zak.habits||[]).find(x=>String(x.id)===String(id));
     if(!h)return;
     h.icon=icon||"•";
-    ZL.syncZakData();
+    ZL.syncZakData({replaceHabits:true});
     render();
   }
 
@@ -104,22 +104,34 @@
     if(!root)return;
     const localSize=(localStorage.getItem("zaklife")||"").length;
     const vaultSize=(localStorage.getItem("zkv")||"").length;
+    const zak=ZL.state.zak||{};
+    const entryCount=Object.keys(zak.entries||{}).length;
+    const habitLogDays=Object.keys(zak.habitLog||{}).length;
+    const habitCount=Array.isArray(zak.habits)?zak.habits.length:0;
+    const ideaCount=Array.isArray(zak.ideas)?zak.ideas.length:0;
     root.innerHTML=`
       <div class="grid grid-4" style="margin-bottom:16px">
         <div class="stat-card"><div class="stat-label">Firebase</div><div class="stat-value ${ZL.fb.ready?"accent-value":"danger-value"}">${ZL.fb.ready?"Ready":"Offline"}</div><div class="stat-note">RTDB</div></div>
         <div class="stat-card"><div class="stat-label">Local ZakLife</div><div class="stat-value blue-value">${Math.round(localSize/1024)}KB</div><div class="stat-note">localStorage/zaklife</div></div>
         <div class="stat-card"><div class="stat-label">Vault</div><div class="stat-value warning-value">${Math.round(vaultSize/1024)}KB</div><div class="stat-note">localStorage/zkv</div></div>
-        <div class="stat-card"><div class="stat-label">Schema</div><div class="stat-value">V1</div><div class="stat-note">Giữ path cũ</div></div>
+        <div class="stat-card"><div class="stat-label">Remote ZakLife</div><div class="stat-value ${ZL.zakDataLoaded?"accent-value":"warning-value"}">${ZL.zakDataLoaded?"Loaded":"Waiting"}</div><div class="stat-note">Chống ghi đè sớm</div></div>
       </div>
       <div class="layout-2">
         ${renderHabitManager()}
         <div class="panel">
-          <div class="panel-title"><div><h2>Actions</h2><p>Công cụ local</p></div></div>
+          <div class="panel-title"><div><h2>Data Safety</h2><p>Đồng bộ an toàn, không ghi đè root khi Firebase chưa tải xong</p></div></div>
+          <div class="grid grid-2" style="margin-bottom:12px">
+            <div class="stat-card"><div class="stat-label">Journal</div><div class="stat-value">${entryCount}</div><div class="stat-note">ngày có dữ liệu</div></div>
+            <div class="stat-card"><div class="stat-label">Habit log</div><div class="stat-value">${habitLogDays}</div><div class="stat-note">ngày đã tick</div></div>
+            <div class="stat-card"><div class="stat-label">Habits</div><div class="stat-value">${habitCount}</div><div class="stat-note">định nghĩa habit</div></div>
+            <div class="stat-card"><div class="stat-label">Ideas</div><div class="stat-value">${ideaCount}</div><div class="stat-note">inbox ý tưởng</div></div>
+          </div>
           <div class="grid">
-            <button class="btn primary" id="syncNowBtn">Đồng bộ journal/habit</button>
+            <button class="btn primary" id="syncNowBtn" ${ZL.zakDataLoaded?"":"disabled"}>Đồng bộ an toàn</button>
             <button class="btn" id="exportBtn">Export local JSON</button>
             <button class="btn" id="themeBtn">Đổi dark/light</button>
           </div>
+          <div class="empty slim">Mỗi lần ghi lên Firebase, app giữ một backup ngày tại <code>zaklife/data_backups/YYYY-MM-DD</code>.</div>
           <div class="path-list">
             ${[
               "state/todayInvoices",

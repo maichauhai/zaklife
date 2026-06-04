@@ -21,6 +21,8 @@
   ZL.events={};
   ZL.modules={};
   ZL.fb={db:null,storage:null,ready:false};
+  ZL.zakDataLoaded=false;
+  ZL.zakDataHasRemote=false;
   ZL.state={
     route:"dashboard",
     pos:{},
@@ -128,18 +130,103 @@
   ZL.saveLocal=function(){
     localStorage.setItem("zaklife",JSON.stringify(ZL.state.zak));
   };
+
+  function normalizeHabit(h){
+    return {
+      ...h,
+      cycleDays:Math.max(1,Number(h?.cycleDays||h?.cycle)||1)
+    };
+  }
+
+  function normalizeHabitList(list){
+    return (Array.isArray(list)?list:[]).filter(Boolean).map(normalizeHabit);
+  }
+
+  function isDefaultHabitList(list){
+    const habits=normalizeHabitList(list);
+    if(habits.length!==DEFAULT_HABITS.length)return false;
+    return DEFAULT_HABITS.every(def=>habits.some(h=>String(h.id)===String(def.id)&&String(h.name||"")===def.name));
+  }
+
+  function mergeObjectMap(remote,local){
+    return {...(remote&&typeof remote==="object"?remote:{}),...(local&&typeof local==="object"?local:{})};
+  }
+
+  function mergeNestedMap(remote,local){
+    const out=mergeObjectMap(remote,{});
+    Object.entries(local&&typeof local==="object"?local:{}).forEach(([key,value])=>{
+      if(value&&typeof value==="object"&&!Array.isArray(value)){
+        out[key]=mergeObjectMap(out[key],value);
+      }else{
+        out[key]=value;
+      }
+    });
+    return out;
+  }
+
+  function mergeListById(remoteList,localList){
+    const map=new Map();
+    (Array.isArray(remoteList)?remoteList:[]).filter(Boolean).forEach(item=>map.set(String(item.id||item.name||map.size),item));
+    (Array.isArray(localList)?localList:[]).filter(Boolean).forEach(item=>map.set(String(item.id||item.name||map.size),item));
+    return [...map.values()];
+  }
+
+  function chooseHabits(remoteList,localList,replaceLocal){
+    const remote=normalizeHabitList(remoteList);
+    const local=normalizeHabitList(localList);
+    if(replaceLocal&&local.length)return local;
+    if(remote.length&&!isDefaultHabitList(remote))return remote;
+    if(local.length&&!isDefaultHabitList(local))return local;
+    if(remote.length)return remote;
+    if(local.length)return local;
+    return [...DEFAULT_HABITS];
+  }
+
+  function mergeZakForRead(remote,current){
+    const next={...current,...remote};
+    next.entries=mergeObjectMap(current.entries,remote.entries);
+    next.habitLog=mergeNestedMap(current.habitLog,remote.habitLog);
+    next.calNotes=mergeObjectMap(current.calNotes,remote.calNotes);
+    next.habits=chooseHabits(remote.habits,current.habits,false);
+    next.ideas=mergeListById(current.ideas,remote.ideas);
+    next.nextIdeaId=Math.max(Number(current.nextIdeaId)||1,Number(remote.nextIdeaId)||1);
+    return next;
+  }
+
+  function buildZakSyncPayload(remote,local,options={}){
+    const payload={
+      entries:mergeObjectMap(remote.entries,local.entries),
+      habitLog:mergeNestedMap(remote.habitLog,local.habitLog),
+      calNotes:mergeObjectMap(remote.calNotes,local.calNotes),
+      habits:chooseHabits(remote.habits,local.habits,!!options.replaceHabits),
+      ideas:mergeListById(remote.ideas,local.ideas),
+      nextIdeaId:Math.max(Number(remote.nextIdeaId)||1,Number(local.nextIdeaId)||1),
+      lastSync:ZL.nowIso()
+    };
+    return payload;
+  }
+
+  function backupZakData(remote){
+    if(!remote||!Object.keys(remote).length||!ZL.fb.db)return Promise.resolve();
+    const backup={...remote,backedUpAt:ZL.nowIso()};
+    return ZL.fb.db.ref("zaklife/data_backups/"+ZL.today()).transaction(current=>current||backup).then(()=>{});
+  }
+
   ZL.syncZakData=function(options={}){
     ZL.saveLocal();
     if(!ZL.fb.db)return Promise.resolve();
+    if(!ZL.zakDataLoaded&&!options.allowBeforeRemote){
+      if(!options.silent)ZL.setSync("syncing","Đợi dữ liệu Firebase");
+      return Promise.resolve(false);
+    }
     if(!options.silent)ZL.setSync("syncing","Đang đồng bộ");
-    return ZL.fb.db.ref("zaklife/data").set({
-      entries:ZL.state.zak.entries||{},
-      habitLog:ZL.state.zak.habitLog||{},
-      calNotes:ZL.state.zak.calNotes||{},
-      habits:ZL.state.zak.habits||[],
-      ideas:ZL.state.zak.ideas||[],
-      nextIdeaId:ZL.state.zak.nextIdeaId||1,
-      lastSync:ZL.nowIso()
+    const ref=ZL.fb.db.ref("zaklife/data");
+    return ref.once("value").then(snap=>{
+      const remote=snap.val()||{};
+      const payload=buildZakSyncPayload(remote,ZL.state.zak,options);
+      ZL.state.zak={...ZL.state.zak,...payload};
+      ZL.saveLocal();
+      return backupZakData(remote).then(()=>ref.update(payload));
     }).then(()=>{
       if(!options.silent)ZL.setSync("online","Đã kết nối");
     }).catch(e=>{
@@ -263,7 +350,9 @@
       });
       ZL.fb.db.ref("zaklife/data").on("value",snap=>{
         const remote=snap.val()||{};
-        ZL.state.zak={...ZL.state.zak,...remote};
+        ZL.zakDataLoaded=true;
+        ZL.zakDataHasRemote=snap.exists();
+        ZL.state.zak=mergeZakForRead(remote,ZL.state.zak);
         if(!Array.isArray(ZL.state.zak.habits))ZL.state.zak.habits=[...DEFAULT_HABITS];
         if(!Array.isArray(ZL.state.zak.ideas))ZL.state.zak.ideas=[];
         if(!ZL.state.zak.nextIdeaId)ZL.state.zak.nextIdeaId=1;
