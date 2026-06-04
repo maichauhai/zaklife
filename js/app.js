@@ -8,6 +8,7 @@
     journal:{title:"Journal & Habits",subtitle:"Nhật ký và thói quen"},
     ideas:{title:"Ideas",subtitle:"Inbox ý tưởng"},
     vault:{title:"Vault",subtitle:"Dữ liệu riêng"},
+    quickdock:{title:"Quick Dock",subtitle:"Link, lệnh và ghi chú nhanh"},
     settings:{title:"Settings",subtitle:"Cấu hình"}
   };
 

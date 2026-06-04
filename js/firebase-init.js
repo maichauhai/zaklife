@@ -27,6 +27,7 @@
     zak:{entries:{},habits:[...DEFAULT_HABITS],habitLog:{},calNotes:{},ideas:[],nextIdeaId:1},
     content:{},
     tasks:{},
+    quickdock:{},
     contentLog:{},
     agents:{},
     wallet:{balances:null},
@@ -126,10 +127,10 @@
   ZL.saveLocal=function(){
     localStorage.setItem("zaklife",JSON.stringify(ZL.state.zak));
   };
-  ZL.syncZakData=function(){
+  ZL.syncZakData=function(options={}){
     ZL.saveLocal();
     if(!ZL.fb.db)return Promise.resolve();
-    ZL.setSync("syncing","Đang đồng bộ");
+    if(!options.silent)ZL.setSync("syncing","Đang đồng bộ");
     return ZL.fb.db.ref("zaklife/data").set({
       entries:ZL.state.zak.entries||{},
       habitLog:ZL.state.zak.habitLog||{},
@@ -138,7 +139,9 @@
       ideas:ZL.state.zak.ideas||[],
       nextIdeaId:ZL.state.zak.nextIdeaId||1,
       lastSync:ZL.nowIso()
-    }).then(()=>ZL.setSync("online","Đã kết nối")).catch(e=>{
+    }).then(()=>{
+      if(!options.silent)ZL.setSync("online","Đã kết nối");
+    }).catch(e=>{
       ZL.setSync("error","Lỗi đồng bộ");
       throw e;
     });
@@ -275,6 +278,11 @@
       ZL.fb.db.ref("zaklife/tasks").on("value",snap=>{
         ZL.state.tasks=snap.val()||{};
         ZL.emit("tasks");
+        ZL.emit("dashboard");
+      });
+      ZL.fb.db.ref("zaklife/quickdock").on("value",snap=>{
+        ZL.state.quickdock=snap.val()||{};
+        ZL.emit("quickdock");
         ZL.emit("dashboard");
       });
       ZL.fb.db.ref("zaklife/agents").on("value",snap=>{

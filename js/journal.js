@@ -63,7 +63,7 @@
     if(!document.getElementById("journalText"))return Promise.resolve();
     ZL.state.zak.entries=ZL.state.zak.entries||{};
     ZL.state.zak.entries[selectedDate]=collectJournalEntry();
-    const sync=ZL.syncZakData();
+    const sync=ZL.syncZakData({silent:options.silent!==false});
     if(options.toast)ZL.toast("Đã lưu journal");
     if(options.renderAfter)sync.then(render);
     return sync;
@@ -71,7 +71,14 @@
 
   function queueJournalSave(){
     clearTimeout(saveTimer);
-    saveTimer=setTimeout(()=>persistJournal(),350);
+    saveTimer=setTimeout(()=>persistJournal(),1000);
+  }
+
+  function isJournalEditing(){
+    const root=document.getElementById("journalRoot");
+    const active=document.activeElement;
+    if(!root||!active||!root.contains(active))return false;
+    return ["INPUT","TEXTAREA","SELECT"].includes(active.tagName);
   }
 
   function saveJournal(){
@@ -367,7 +374,10 @@
   }
 
   ZL.modules.journal={render};
-  ZL.on("zak",render);
+  ZL.on("zak",()=>{
+    if(ZL.state.route==="journal"&&isJournalEditing())return;
+    render();
+  });
   ZL.on("route-change",payload=>{
     if(payload?.from==="journal"){
       clearTimeout(saveTimer);
