@@ -13,10 +13,12 @@ local edit -> GitHub -> CI check -> staging -> production -> automation -> monit
 - Local app: `C:\Users\pc\Desktop\Zak`
 - Working repo: `C:\Users\pc\Desktop\Codex\zaklife-push`
 - Production branch: `main`
+- Staging branch: `staging`
 - CI template: `docs/ci/zaklife-ci.yml`
 - Production site: GitHub Pages from the repository
 - Content data: Firebase path `zaklife/content-calendar`
 - Monstea posting worker: `C:\Users\pc\Desktop\Monstea\n8n\scripts\post_due_facebook.py`
+- Automation heartbeat: Firebase path `zaklife/automation/monsteaFacebook`
 
 ## Rules
 
@@ -28,6 +30,13 @@ local edit -> GitHub -> CI check -> staging -> production -> automation -> monit
 6. Every code push must pass JavaScript/Python syntax checks before being treated as safe.
 
 Note: GitHub rejected creating `.github/workflows/ci.yml` because the current token does not have `workflow` scope. To activate CI later, move `docs/ci/zaklife-ci.yml` to `.github/workflows/ci.yml` using a token/account with workflow permission.
+
+Fast activation path:
+
+1. Give GitHub token permission to edit workflow files.
+2. Move `docs/ci/zaklife-ci.yml` to `.github/workflows/ci.yml`.
+3. Push `staging`.
+4. If CI passes and local staging looks correct, merge `staging` into `main`.
 
 ## Staging design
 
@@ -46,6 +55,12 @@ Until a real staging URL is configured, staging means:
 - verify the served local app,
 - only then merge or push to `main`.
 
+Commercial phase later:
+
+- keep `main` as production,
+- add Vercel preview for `staging`,
+- keep GitHub Pages or Vercel production behind the same release rule.
+
 ## Automation design
 
 Content Calendar is the source of truth.
@@ -62,15 +77,14 @@ ZakLife Content Calendar
 
 ## Monitoring design
 
-Minimum checks:
+Current checks:
 
-- n8n health: `http://127.0.0.1:5678`
+- automation heartbeat: `zaklife/automation/monsteaFacebook`
+- content post status: `approved`, `posted`, `missed`, `failed`
 - relay health: `http://127.0.0.1:8787/health`
 - post log: `C:\Users\pc\Desktop\Monstea\n8n\logs\post-log.jsonl`
-- if no scheduler log appears for more than 20 minutes during posting hours, treat automation as unhealthy.
+- if no heartbeat appears for more than 20 minutes, Dashboard marks automation as stale.
 
 Next step:
 
-- add a small health script that writes status to Firebase,
-- show automation health on ZakLife Dashboard,
 - send Telegram/Zalo alert when no checks run for more than 20 minutes.

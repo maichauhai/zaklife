@@ -30,6 +30,7 @@
     quickdock:{},
     contentLog:{},
     agents:{},
+    automation:{},
     wallet:{balances:null},
     nana:{},
     media:{},
@@ -288,6 +289,11 @@
       ZL.fb.db.ref("zaklife/agents").on("value",snap=>{
         ZL.state.agents=snap.val()||{};
         ZL.emit("agents");
+        ZL.emit("dashboard");
+      });
+      ZL.fb.db.ref("zaklife/automation").on("value",snap=>{
+        ZL.state.automation=snap.val()||{};
+        ZL.emit("automation");
         ZL.emit("dashboard");
       });
       ZL.fb.db.ref("zaklife/nana_messages").on("value",snap=>{

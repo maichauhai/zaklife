@@ -263,6 +263,65 @@
     </div>`;
   }
 
+  function automationRows(){
+    const raw=ZL.state.automation||{};
+    return Object.entries(raw).map(([id,item])=>({id,...(item||{})}));
+  }
+
+  function automationHealth(item){
+    if(!item)return {tone:"warning",label:"Waiting",age:Infinity};
+    const age=staleMinutes(item.last_check_at||item.updated_at);
+    const staleAfter=Number(item.stale_after_minutes)||20;
+    const status=String(item.status||"unknown").toLowerCase();
+    if(!Number.isFinite(age))return {tone:"warning",label:"No check",age};
+    if(status==="error"||item.last_error)return {tone:"danger",label:"Error",age};
+    if(age>staleAfter)return {tone:"warning",label:`Stale ${age}m`,age};
+    if(status==="locked")return {tone:"warning",label:"Locked",age};
+    if(status==="checking")return {tone:"success",label:"Checking",age};
+    if(status==="ok")return {tone:"success",label:"OK",age};
+    return {tone:"warning",label:status==="unknown"?"Unknown":status,age};
+  }
+
+  function renderAutomationMonitoring(){
+    const rows=automationRows();
+    const content=ZL.contentPosts();
+    const failed=content.filter(p=>p.status==="failed").length;
+    const missed=content.filter(p=>p.status==="missed").length;
+    const approved=content.filter(p=>p.status==="approved").length;
+    return `<div class="panel automation-panel" style="margin-top:16px">
+      <div class="panel-title">
+        <div><h2>Automation Monitoring</h2><p>Worker/n8n ghi heartbeat lên Firebase, Dashboard đọc lại để cảnh báo.</p></div>
+        <span class="badge ${rows.length?"success":"warning"}">${rows.length?"Tracking":"Waiting"}</span>
+      </div>
+      <div class="automation-summary">
+        <div><span>Approved chờ lịch</span><strong class="blue-value">${approved}</strong></div>
+        <div><span>Missed</span><strong class="${missed?"danger-value":"accent-value"}">${missed}</strong></div>
+        <div><span>Failed</span><strong class="${failed?"danger-value":"accent-value"}">${failed}</strong></div>
+      </div>
+      ${rows.length?`<div class="automation-grid">
+        ${rows.map(row=>{
+          const health=automationHealth(row);
+          return `<div class="automation-card">
+            <div class="automation-card-head">
+              <div>
+                <strong>${ZL.escape(row.name||row.id)}</strong>
+                <span>${ZL.escape(row.description||row.source||"content scheduler")}</span>
+              </div>
+              <span class="badge ${health.tone}">${ZL.escape(health.label)}</span>
+            </div>
+            <div class="automation-facts">
+              <div><span>Last check</span><strong>${ZL.escape(fmtTime(row.last_check_at||row.updated_at))}</strong></div>
+              <div><span>Result</span><strong>${ZL.escape(row.last_result||row.status||"--")}</strong></div>
+              <div><span>Posted</span><strong>${Number(row.posted)||0}</strong></div>
+              <div><span>Late skipped</span><strong>${Number(row.skipped_late)||0}</strong></div>
+            </div>
+            ${row.last_error?`<div class="automation-error">${ZL.escape(row.last_error)}</div>`:""}
+          </div>`;
+        }).join("")}
+      </div>`:`<div class="empty slim">Chưa có heartbeat. Worker sẽ ghi vào Firebase path <code>zaklife/automation/monsteaFacebook</code> sau lần chạy kế tiếp.</div>`}
+    </div>`;
+  }
+
   function commandItems(today,stats,posts,streak){
     const tasks=taskRows();
     const dueToday=tasks.filter(t=>t.status!=="done"&&t.dueDate===today);
@@ -272,6 +331,7 @@
     const todayPosts=ZL.contentPosts().filter(p=>p.scheduledDate===today&&p.status!=="posted");
     const balance=ZL.state.wallet?.balances;
     const balanceAge=staleMinutes(balance?.updatedAt);
+    const automation=automationHealth(ZL.state.automation?.monsteaFacebook);
     const items=[];
     if(!stats.count)items.push({route:"pos",label:"Kiểm tra POS hôm nay",meta:"Chưa có đơn ghi nhận"});
     if(activeNotes.length)items.push({route:"dashboard",label:`Xử lý ${activeNotes.length} ghi chú Monstea`,meta:activeNotes[0]?.text||"Ghi chú vận hành"});
@@ -281,6 +341,7 @@
     if(posts<3)items.push({route:"content",label:"Bổ sung lịch content",meta:"Scheduled + Approved còn mỏng"});
     if(!todayEntry.text&&!todayEntry.brainDump&&!todayEntry.win)items.push({route:"journal",label:"Ghi Daily Review",meta:"Journal hôm nay còn trống"});
     if(balance&&balanceAge>30)items.push({route:"dashboard",label:"Kiểm tra worker balance",meta:`Balance đã ${balanceAge} phút chưa cập nhật`});
+    if(automation.tone!=="success")items.push({route:"dashboard",label:"Kiểm tra automation fanpage",meta:`Trạng thái: ${automation.label}`});
     if(!items.length)items.push({route:"tasks",label:"Ngày đang ổn",meta:`Doanh thu ${ZL.money(stats.total)} · streak ${streak}`});
     return items.slice(0,6);
   }
@@ -568,6 +629,8 @@
     if(posts<3)alerts.push("Lịch content còn mỏng.");
     const approved=ZL.contentPosts().filter(p=>p.status==="approved").length;
     if(approved)alerts.push(`${approved} bài đã approved.`);
+    const automation=automationHealth(ZL.state.automation?.monsteaFacebook);
+    if(automation.tone!=="success")alerts.push(`Automation fanpage: ${automation.label}.`);
     root.innerHTML=`
       ${renderCommandCenter(today,stats,posts,streak)}
       ${renderInsightEngine(today,stats,posts,streak)}
@@ -580,6 +643,7 @@
         <div class="stat-card"><div class="stat-label">Habit streak</div><div class="stat-value blue-value">${streak}</div><div class="stat-note">Ngày liên tiếp</div></div>
       </div>
       ${renderWalletBalance()}
+      ${renderAutomationMonitoring()}
       <div class="layout-2 dashboard-main" style="margin-top:16px">
         <div class="panel">
           <div class="panel-title">
@@ -600,6 +664,6 @@
   }
 
   ZL.modules.dashboard={render};
-  ["dashboard","pos","content","agents","nana","zak","wallet"].forEach(evt=>ZL.on(evt,render));
+  ["dashboard","pos","content","agents","nana","zak","wallet","automation"].forEach(evt=>ZL.on(evt,render));
   window.addEventListener("resize",()=>{if(ZL.state.route==="dashboard")drawRevenueChart();});
 })();

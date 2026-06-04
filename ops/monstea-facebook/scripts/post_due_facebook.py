@@ -19,6 +19,7 @@ CREDENTIAL_PATH = MONSTEA_ROOT / "credentials" / "facebook.json"
 FIREBASE_DB_URL = "https://monstea-pos-default-rtdb.asia-southeast1.firebasedatabase.app"
 FIREBASE_CALENDAR_PATH = "zaklife/content-calendar"
 FIREBASE_LOG_PATH = "zaklife/content-log"
+FIREBASE_AUTOMATION_PATH = "zaklife/automation/monsteaFacebook"
 LOCAL_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 MAX_LATE_MINUTES = int(os.environ.get("MONSTEA_MAX_LATE_MINUTES", "30"))
 LOCK_PATH = ROOT / "logs" / "post_due.lock"
@@ -79,6 +80,21 @@ def log_event(event):
         f.write(json.dumps(event, ensure_ascii=False) + "\n")
     try:
         firebase_post(FIREBASE_LOG_PATH, event)
+    except Exception:
+        pass
+
+
+def automation_patch(data):
+    payload = {
+        "name": "Monstea Facebook Scheduler",
+        "description": "Approved content-calendar posts -> Facebook fanpage",
+        "stale_after_minutes": 20,
+        "max_late_minutes": MAX_LATE_MINUTES,
+        "updated_at": now_iso(),
+        **data,
+    }
+    try:
+        firebase_patch(FIREBASE_AUTOMATION_PATH, payload)
     except Exception:
         pass
 
@@ -315,9 +331,23 @@ def process(source="firebase", dry_run=False, post_id=None):
     lock_fd = acquire_lock()
     if lock_fd is None:
         log_event({"level": "info", "event": "post_due_locked", "source": source})
+        automation_patch({
+            "status": "locked",
+            "last_check_at": now_iso(),
+            "last_result": "locked",
+            "source": source,
+            "dry_run": dry_run,
+        })
         return {"posted": 0, "locked": True, "message": "Another due-post run is active", "source": source}
 
     try:
+        automation_patch({
+            "status": "checking",
+            "last_check_at": now_iso(),
+            "last_result": "checking",
+            "source": source,
+            "dry_run": dry_run,
+        })
         creds = load_json(CREDENTIAL_PATH, {})
         if not creds.get("page_access_token") or not creds.get("page_id"):
             raise RuntimeError(f"Missing page_access_token/page_id in {CREDENTIAL_PATH}")
@@ -331,6 +361,18 @@ def process(source="firebase", dry_run=False, post_id=None):
 
         if not due_items:
             log_event({"level": "info", "event": "no_due_posts", "source": actual_source})
+            automation_patch({
+                "status": "ok",
+                "last_check_at": now_iso(),
+                "last_result": "no_due",
+                "source": actual_source,
+                "dry_run": dry_run,
+                "due_count": 0,
+                "posted": 0,
+                "failed": 0,
+                "skipped_late": 0,
+                "last_error": None,
+            })
             return {"posted": 0, "message": "No due approved posts", "source": actual_source}
 
         posted = 0
@@ -383,7 +425,30 @@ def process(source="firebase", dry_run=False, post_id=None):
                 failed += 1
                 update_post(actual_source, pid, {"last_error": str(exc), "status": "failed"}, items)
                 log_event({"level": "error", "event": "post_failed", "post_id": pid, "error": str(exc), "source": actual_source})
-        return {"posted": posted, "failed": failed, "skipped_late": skipped_late, "dry_run": dry_run, "source": actual_source}
+        result = {"posted": posted, "failed": failed, "skipped_late": skipped_late, "dry_run": dry_run, "source": actual_source}
+        automation_patch({
+            "status": "error" if failed else "ok",
+            "last_check_at": now_iso(),
+            "last_result": "processed",
+            "source": actual_source,
+            "dry_run": dry_run,
+            "due_count": len(due_items),
+            "posted": posted,
+            "failed": failed,
+            "skipped_late": skipped_late,
+            "last_error": f"{failed} post(s) failed" if failed else None,
+        })
+        return result
+    except Exception as exc:
+        automation_patch({
+            "status": "error",
+            "last_check_at": now_iso(),
+            "last_result": "run_failed",
+            "source": source,
+            "dry_run": dry_run,
+            "last_error": str(exc),
+        })
+        raise
     finally:
         release_lock(lock_fd)
 

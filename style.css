@@ -178,6 +178,26 @@ canvas{width:100%;height:100%;display:block}
 .wallet-row-value{display:flex;align-items:center;justify-content:flex-end;gap:8px;white-space:nowrap}
 .wallet-row-value strong{font-variant-numeric:tabular-nums}
 .wallet-disclaimer{margin-top:12px}
+.automation-panel{border-color:rgba(245,158,11,.24)}
+.automation-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.automation-summary div,.automation-card{
+  border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.025);padding:12px;min-width:0
+}
+.automation-summary span,.automation-facts span{
+  display:block;color:var(--text-muted);font-size:.7rem;font-weight:900;text-transform:uppercase
+}
+.automation-summary strong{display:block;margin-top:8px;font-size:1.18rem;font-variant-numeric:tabular-nums}
+.automation-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.automation-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}
+.automation-card-head strong{display:block;font-weight:900;overflow-wrap:anywhere}
+.automation-card-head span:not(.badge){display:block;margin-top:4px;color:var(--text-muted);font-size:.76rem}
+.automation-facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.automation-facts div{min-width:0}
+.automation-facts strong{display:block;margin-top:4px;font-size:.8rem;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.automation-error{
+  margin-top:10px;border:1px solid rgba(248,113,113,.28);border-radius:10px;
+  background:rgba(248,113,113,.08);color:var(--danger);padding:9px 10px;font-size:.78rem;overflow-wrap:anywhere
+}
 .command-shell{display:grid;gap:14px;margin-bottom:16px}
 .command-hero{
   display:flex;align-items:center;justify-content:space-between;gap:18px;
@@ -717,6 +737,8 @@ body.light{
   .command-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .action-list{grid-template-columns:1fr}
   .insight-grid,.insight-body{grid-template-columns:1fr}
+  .automation-grid{grid-template-columns:1fr}
+  .automation-facts{grid-template-columns:repeat(2,minmax(0,1fr))}
   .bookmark-grid,.quickdock-results{grid-template-columns:repeat(2,minmax(0,1fr))}
   .qd-command-list{grid-template-columns:repeat(2,minmax(230px,1fr))}
   .content-form-panel{position:static}
@@ -744,6 +766,7 @@ body.light{
   .wallet-summary{grid-template-columns:1fr}
   .wallet-row{display:grid}
   .wallet-row-value{justify-content:flex-start}
+  .automation-summary{grid-template-columns:1fr}
   .cashflow-cards{grid-template-columns:1fr}
   .command-hero{display:grid}
   .command-score{text-align:left;min-width:0}
