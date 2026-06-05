@@ -1,0 +1,62 @@
+{
+  "id": "zaklife-content-intake",
+  "name": "ZakLife - Content Agent Intake",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "zaklife-content-intake",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "content-intake-webhook",
+      "name": "Content Agent Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -460,
+        80
+      ],
+      "webhookId": "zaklife-content-intake"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8788/append",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body || $json) }}",
+        "options": {}
+      },
+      "id": "append-content-sheet",
+      "name": "Append Content To Google Sheet",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -120,
+        80
+      ]
+    }
+  ],
+  "connections": {
+    "Content Agent Webhook": {
+      "main": [
+        [
+          {
+            "node": "Append Content To Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Ho_Chi_Minh"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "zaklife-content-intake-v1"
+}

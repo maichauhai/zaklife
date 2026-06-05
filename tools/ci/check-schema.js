@@ -25,8 +25,32 @@ const dashboardJs = read("js/dashboard.js");
 const worker = read("ops/monstea-facebook/scripts/post_due_facebook.py");
 const allRuntime = `${firebaseInit}\n${contentJs}\n${dashboardJs}\n${worker}`;
 
-for (const firebasePath of contract.firebasePaths) {
+const activeFirebasePaths = contract.activeFirebasePaths || contract.firebasePaths || [];
+const backupPaths = contract.backupPaths || activeFirebasePaths;
+const moduleFirebasePaths = contract.moduleFirebasePaths || {};
+const writeRules = contract.writeRules || {};
+
+for (const firebasePath of activeFirebasePaths) {
   assert(allRuntime.includes(firebasePath), `Firebase path not referenced by runtime: ${firebasePath}`);
+}
+
+const backupScript = read("ops/zaklife-maintenance/scripts/backup_firebase.py");
+for (const firebasePath of backupPaths) {
+  assert(backupScript.includes(firebasePath), `Firebase path not covered by backup script: ${firebasePath}`);
+}
+
+const migrationScriptPath = "ops/zaklife-maintenance/scripts/migrate_zaklife_data_v2.py";
+if (fs.existsSync(path.join(root, migrationScriptPath))) {
+  const migrationScript = read(migrationScriptPath);
+  for (const firebasePath of Object.values(moduleFirebasePaths)) {
+    assert(migrationScript.includes(firebasePath) || backupScript.includes(firebasePath), `Module path not covered by migration/backup tooling: ${firebasePath}`);
+  }
+}
+
+for (const firebasePath of writeRules.forbidSetOnPaths || []) {
+  const escapedPath = firebasePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const broadSetPattern = new RegExp(`ref\\(["'\`]${escapedPath}["'\`]\\)\\.set\\(`);
+  assert(!broadSetPattern.test(allRuntime), `Broad Firebase set() is forbidden on ${firebasePath}`);
 }
 
 for (const field of contract.contentPostRequiredFields) {

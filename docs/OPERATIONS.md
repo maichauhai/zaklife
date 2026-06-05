@@ -18,8 +18,10 @@ local edit -> GitHub -> CI check -> staging -> production -> automation -> monit
 - Production site: GitHub Pages from the repository
 - Content data: Firebase path `zaklife/content-calendar`
 - Monstea posting worker: `C:\Users\pc\Desktop\Monstea\n8n\scripts\post_due_facebook.py`
+- Content sheet import: `ops/zaklife-content-sheet/scripts/sync_content_sheet.py`
 - Automation heartbeat: Firebase path `zaklife/automation/monsteaFacebook`
 - Schema contract: `docs/schema/zaklife-contract.json`
+- Data model v2: `docs/schema/DATA_MODEL_V2.md`
 - Local backups: `C:\Users\<user>\Desktop\ZakBackups`
 
 ## Rules
@@ -29,8 +31,9 @@ local edit -> GitHub -> CI check -> staging -> production -> automation -> monit
 3. Only posts with `status: "approved"` can be posted by automation.
 4. If automation is late by more than 30 minutes, mark the post as `missed` instead of posting late.
 5. n8n and Windows Task Scheduler may both scan due posts, but the Python worker uses a lock to avoid duplicates.
-6. Every code push must pass JavaScript/Python syntax checks before being treated as safe.
-7. Secrets must stay in `.env`, credentials folders, or VPS environment variables. Do not commit real tokens.
+6. Google Sheet content rows are imported as ZakLife `draft` only; approval happens inside ZakLife.
+7. Every code push must pass JavaScript/Python syntax checks before being treated as safe.
+8. Secrets must stay in `.env`, credentials folders, or VPS environment variables. Do not commit real tokens.
 
 Note: GitHub rejected creating `.github/workflows/ci.yml` because the current token does not have `workflow` scope. To activate CI later, move `docs/ci/zaklife-ci.yml` to `.github/workflows/ci.yml` using a token/account with workflow permission.
 
@@ -69,6 +72,11 @@ Commercial phase later:
 Content Calendar is the source of truth.
 
 ```text
+Google Sheet Content tab
+  -> sync_content_sheet.py
+  -> Firebase zaklife/content-calendar
+  -> ZakLife Content Calendar drafts
+
 ZakLife Content Calendar
   -> Firebase zaklife/content-calendar
   -> n8n schedule or Windows backup scheduler
@@ -77,6 +85,13 @@ ZakLife Content Calendar
   -> Firebase status update
   -> ZakLife shows posted / missed / failed
 ```
+
+Google Sheet intake rules:
+
+- Sheet rows must use `status=ready` to be imported.
+- Imported rows become `draft` in ZakLife, so review and approval happen inside ZakLife.
+- Existing imported rows are skipped to avoid overwriting edits made in ZakLife.
+- Posted posts older than 7 days are deleted by the sheet sync job.
 
 ## Monitoring design
 
@@ -105,17 +120,46 @@ Backup script:
 ops/zaklife-maintenance/scripts/backup_firebase.py
 ```
 
-Default paths:
+The backup script reads `docs/schema/zaklife-contract.json` and stores:
+
+- backup format and schema contract version
+- exact Firebase path list
+- JSON data per path
+- SHA-256 checksum per path
+- automation heartbeat at `zaklife/automation/firebaseBackup`
+
+Default paths include both legacy and module paths:
 
 - `state`
+- `zaklife/meta`
 - `zaklife/data`
+- `zaklife/data_backups`
+- `zaklife/journal/entries`
+- `zaklife/habits/definitions`
+- `zaklife/habits/logs`
+- `zaklife/calendar/notes`
+- `zaklife/ideas/items`
+- `zaklife/ideas/meta`
 - `zaklife/content-calendar`
 - `zaklife/tasks`
 - `zaklife/quickdock`
+- `zaklife/agents`
 - `zaklife/automation`
 - `zaklife/nana_messages`
 - `zaklife/wallet/balances/current`
 - `zaklife/vault_encrypted`
+
+Verify an existing backup:
+
+```powershell
+python .\ops\zaklife-maintenance\scripts\backup_firebase.py --verify-file "C:\Users\<user>\Desktop\ZakBackups\zaklife-backup-YYYYMMDD-HHMMSS.json"
+```
+
+Generate a v2 migration plan without changing Firebase:
+
+```powershell
+python .\ops\zaklife-maintenance\scripts\migrate_zaklife_data_v2.py --from-backup "C:\Users\<user>\Desktop\ZakBackups\zaklife-backup-YYYYMMDD-HHMMSS.json" --write-plan "C:\Users\<user>\Desktop\ZakBackups\migration-plan-v2.json"
+```
 
 Register local scheduled tasks:
 

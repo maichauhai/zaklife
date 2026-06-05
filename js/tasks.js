@@ -85,6 +85,20 @@
     return t.dueDate;
   }
 
+  function addMonths(dateKey,months){
+    const d=new Date(dateKey+"T00:00:00");
+    d.setMonth(d.getMonth()+months);
+    return ZL.dateKey(d);
+  }
+
+  function quickDueDate(type){
+    if(type==="3d")return ZL.addDays(today(),3);
+    if(type==="7d")return ZL.addDays(today(),7);
+    if(type==="14d")return ZL.addDays(today(),14);
+    if(type==="1m")return addMonths(today(),1);
+    return today();
+  }
+
   function filteredTasks(){
     const q=search.trim().toLowerCase();
     const bounds=weekBounds();
@@ -112,6 +126,9 @@
       <div class="task-meta">
         <span class="${isOverdue(t)?"danger-value":""}">${dueLabel(t)}</span>
         <span>Priority <i style="background:${pri.color}"></i></span>
+      </div>
+      <div class="task-due-actions" aria-label="Quick due date">
+        ${[["3d","3D"],["7d","7D"],["14d","14D"],["1m","1M"]].map(([key,label])=>`<button type="button" data-task-due="${ZL.escape(t.id)}" data-due-shortcut="${key}">${label}</button>`).join("")}
       </div>
       ${t.status==="doing"?`<div class="task-progress"><span style="width:${progress}%"></span><em>${progress}%</em></div>`:""}
     </article>`;
@@ -255,6 +272,11 @@
       const id=btn.dataset.starTask;
       const t=tasks().find(x=>String(x.id)===String(id));
       if(t)patchTask(id,{starred:!t.starred});
+    });
+    root.querySelectorAll("[data-task-due]").forEach(btn=>btn.onclick=e=>{
+      e.stopPropagation();
+      const id=btn.dataset.taskDue;
+      patchTask(id,{dueDate:quickDueDate(btn.dataset.dueShortcut)});
     });
     root.querySelectorAll("[data-complete-focus]").forEach(input=>input.onchange=()=>patchTask(input.dataset.completeFocus,{status:"done",completedAt:ZL.nowIso()}));
     root.querySelectorAll(".task-card").forEach(card=>{

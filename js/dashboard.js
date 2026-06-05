@@ -454,41 +454,6 @@
     </div>`;
   }
 
-  function dailyReview(today,stats){
-    const tasks=taskRows();
-    const entry=(ZL.state.zak.entries||{})[today]||{};
-    const done=tasks.filter(t=>taskDoneOn(t,today));
-    const pending=tasks.filter(t=>t.status!=="done"&&t.dueDate===today);
-    const doneHabits=habitsDone(today);
-    const posts=ZL.contentPosts().filter(p=>p.scheduledDate===today);
-    const openNotes=noteRows().filter(n=>!n.done);
-    const lines=[];
-    lines.push(stats.count?`Monstea có ${stats.count} đơn, doanh thu ${ZL.money(stats.total)}.`:"Monstea hôm nay chưa có đơn ghi nhận.");
-    if(stats.top)lines.push(`Món nổi bật: ${stats.top.name} (${stats.top.qty} lượt).`);
-    lines.push(done.length?`Hoàn thành ${done.length} task: ${done.slice(0,3).map(t=>t.title).join(", ")}.`:"Chưa có task nào được đánh dấu xong hôm nay.");
-    if(pending.length)lines.push(`Còn ${pending.length} task hôm nay chưa xong.`);
-    lines.push(doneHabits.length?`Đã tick ${doneHabits.length} habit: ${doneHabits.slice(0,4).map(h=>`${h.icon||""} ${h.name}`).join(", ")}.`:"Chưa tick habit hôm nay.");
-    if(posts.length)lines.push(`Có ${posts.length} bài content trong lịch hôm nay.`);
-    if(openNotes.length)lines.push(`Monstea còn ${openNotes.length} ghi chú vận hành đang mở.`);
-    if(entry.win)lines.push(`Win of the day: ${entry.win.slice(0,180)}`);
-    else if(entry.text||entry.brainDump)lines.push("Journal/Brain dump đã có dữ liệu, còn thiếu Win of the day.");
-    else lines.push("Journal hôm nay chưa có nội dung.");
-    return lines;
-  }
-
-  function renderDailyReview(today,stats){
-    const lines=dailyReview(today,stats);
-    return `<div class="panel daily-review-panel" style="margin-top:16px">
-      <div class="panel-title">
-        <div><h2>Daily Review tự động</h2><p>Nana có thể dùng phần này để báo cáo cuối ngày</p></div>
-        <button class="btn sm" data-route-jump="journal">Mở Journal</button>
-      </div>
-      <div class="review-lines">
-        ${lines.map(line=>`<div class="review-line">${ZL.escape(line)}</div>`).join("")}
-      </div>
-    </div>`;
-  }
-
   function searchCorpus(){
     const corpus=[];
     taskRows().forEach(t=>corpus.push({type:"Task",route:"tasks",title:t.title||"Task",detail:`${t.category||"personal"} · ${t.status||"todo"} · ${t.dueDate||"no date"}`,text:`${t.title||""} ${t.category||""} ${t.status||""} ${t.priority||""}`}));
@@ -568,7 +533,6 @@
         <div class="panel"><div class="panel-title"><div><h2>Nana messages</h2><p>Nhắc việc và tín hiệu gần đây.</p></div></div>${renderNanaMessages()}</div>
       </div>
       ${renderAutomationMonitoring()}
-      ${renderDailyReview(today,stats)}
       ${renderWalletBalance()}`;
     bind(root);
   }

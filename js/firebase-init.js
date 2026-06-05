@@ -23,6 +23,7 @@
   ZL.fb={db:null,storage:null,ready:false};
   ZL.zakDataLoaded=false;
   ZL.zakDataHasRemote=false;
+  ZL.tasksLoaded=false;
   ZL.state={
     route:"dashboard",
     pos:{},
@@ -370,6 +371,7 @@
       });
       ZL.fb.db.ref("zaklife/tasks").on("value",snap=>{
         ZL.state.tasks=snap.val()||{};
+        ZL.tasksLoaded=true;
         ZL.emit("tasks");
         ZL.emit("dashboard");
       });

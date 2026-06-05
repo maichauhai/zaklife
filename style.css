@@ -158,6 +158,7 @@ canvas{width:100%;height:100%;display:block}
   padding:11px 0;border-bottom:1px solid rgba(255,255,255,.05);
 }
 .agent-row:last-child,.note-row:last-child,.habit-row:last-child,.media-row:last-child{border-bottom:0}
+.habit-row.habit-due{border-left:3px solid var(--warning);padding-left:10px}
 .agent-name,.item-title{font-weight:800;overflow-wrap:anywhere}
 .item-meta{color:var(--text-muted);font-size:.76rem;margin-top:3px;overflow-wrap:anywhere}
 .wallet-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
@@ -620,7 +621,10 @@ textarea.tall{min-height:272px}
 .content-event.scheduled{background:rgba(245,158,11,.16);border-color:rgba(245,158,11,.34)}
 .content-event.approved{background:rgba(16,185,129,.2);border-color:rgba(16,185,129,.45)}
 .content-event.posted{background:rgba(96,165,250,.18);border-color:rgba(96,165,250,.36)}
-.content-form-panel{position:sticky;top:16px;min-width:0;overflow:hidden}
+.content-form-panel{position:sticky;top:16px;min-width:0;overflow:hidden;padding-bottom:22px}
+#contentCaption.content-caption-input{
+  min-height:300px;height:34vh;max-height:480px;line-height:1.55;
+}
 .upload-box{
   border:1px dashed rgba(255,255,255,.18);border-radius:10px;padding:14px;margin-bottom:12px;
   display:grid;gap:8px;text-align:center;color:var(--text-muted)
@@ -712,6 +716,12 @@ textarea.tall{min-height:272px}
 }
 .task-meta{display:flex;justify-content:space-between;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);color:var(--text-secondary);font-size:.74rem}
 .task-meta i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-left:5px}
+.task-due-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.task-due-actions button{
+  min-height:26px;border:1px solid rgba(96,165,250,.22);border-radius:8px;
+  background:rgba(96,165,250,.08);color:var(--blue);font-size:.68rem;font-weight:900;padding:0 8px
+}
+.task-due-actions button:hover{border-color:rgba(96,165,250,.45);background:rgba(96,165,250,.14)}
 .task-progress{display:grid;grid-template-columns:minmax(0,1fr) 34px;gap:8px;align-items:center;margin-top:10px}
 .task-progress span{height:5px;border-radius:999px;background:var(--accent)}
 .task-progress em{font-style:normal;color:var(--text-secondary);font-size:.72rem}

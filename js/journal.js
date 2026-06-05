@@ -10,6 +10,8 @@
   let selectedDate=ZL.today();
   let calendarMonth=ZL.today().slice(0,7);
   let saveTimer=null;
+  const HABIT_TASK_SOURCE="habit-cycle";
+  const pendingHabitTasks=new Set();
 
   function entryFor(date){
     return (ZL.state.zak.entries||{})[date]||{};
@@ -32,6 +34,101 @@
       else if(i>0)break;
     }
     return streak;
+  }
+
+  function dayDiff(from,to){
+    const start=new Date(`${from}T00:00:00`);
+    const end=new Date(`${to}T00:00:00`);
+    return Math.round((end-start)/86400000);
+  }
+
+  function lastHabitDoneDate(habitId,date){
+    const logMap=ZL.state.zak.habitLog||{};
+    return Object.keys(logMap)
+      .filter(key=>key<date&&logMap[key]?.[habitId])
+      .sort()
+      .pop()||"";
+  }
+
+  function isHabitDueOnDate(habit,date){
+    if(!habit||!habit.id||date>ZL.today())return false;
+    if(habitLog(date)[habit.id])return false;
+    const cycleDays=Math.max(1,Number(habit.cycleDays)||1);
+    const lastDone=lastHabitDoneDate(habit.id,date);
+    if(!lastDone)return true;
+    return dayDiff(lastDone,date)>=cycleDays;
+  }
+
+  function openHabitTask(habitId){
+    return ZL.normalizeList(ZL.state.tasks).some(task=>
+      task.source===HABIT_TASK_SOURCE&&
+      String(task.habitId)===String(habitId)&&
+      task.status!=="done"
+    );
+  }
+
+  function habitTaskRef(id){
+    return ZL.fb.db?.ref("zaklife/tasks/"+id);
+  }
+
+  function saveHabitTask(task){
+    if(!ZL.fb.db){
+      ZL.state.tasks=ZL.state.tasks||{};
+      ZL.state.tasks[task.id]=task;
+      ZL.emit("tasks");
+      return Promise.resolve();
+    }
+    return habitTaskRef(task.id).set(task);
+  }
+
+  function patchHabitTask(id,patch){
+    if(!ZL.fb.db){
+      ZL.state.tasks=ZL.state.tasks||{};
+      ZL.state.tasks[id]={...(ZL.state.tasks[id]||{}),id,...patch};
+      ZL.emit("tasks");
+      return Promise.resolve();
+    }
+    return habitTaskRef(id).update({...patch,updatedAt:ZL.nowIso()});
+  }
+
+  function completeHabitTasks(habitId,date){
+    const updates=ZL.normalizeList(ZL.state.tasks)
+      .filter(task=>
+        task.source===HABIT_TASK_SOURCE&&
+        String(task.habitId)===String(habitId)&&
+        task.status!=="done"&&
+        (!task.dueDate||task.dueDate<=date)
+      )
+      .map(task=>patchHabitTask(task.id,{status:"done",completedAt:ZL.nowIso()}));
+    return Promise.all(updates);
+  }
+
+  function syncHabitDueTasks(){
+    if(ZL.fb.db&&(!ZL.zakDataLoaded||!ZL.tasksLoaded))return Promise.resolve();
+    const date=ZL.today();
+    const due=habits().filter(h=>isHabitDueOnDate(h,date));
+    const creates=due
+      .filter(h=>!openHabitTask(h.id)&&!pendingHabitTasks.has(String(h.id)))
+      .map(h=>{
+        pendingHabitTasks.add(String(h.id));
+        const id=`habit-cycle-${String(h.id).replace(/[^a-zA-Z0-9_-]/g,"_")}-${date}`;
+        const task={
+          id,
+          title:`Làm habit: ${h.icon||""} ${h.name||"Habit"}`.trim(),
+          category:"personal",
+          priority:"medium",
+          status:"todo",
+          dueDate:date,
+          source:HABIT_TASK_SOURCE,
+          habitId:h.id,
+          habitName:h.name||"",
+          habitCycleDays:Math.max(1,Number(h.cycleDays)||1),
+          createdAt:ZL.nowIso(),
+          updatedAt:ZL.nowIso()
+        };
+        return saveHabitTask(task).finally(()=>pendingHabitTasks.delete(String(h.id)));
+      });
+    return Promise.all(creates);
   }
 
   function collectJournalEntry(){
@@ -118,7 +215,10 @@
     ZL.state.zak.habitLog=ZL.state.zak.habitLog||{};
     ZL.state.zak.habitLog[date]=ZL.state.zak.habitLog[date]||{};
     ZL.state.zak.habitLog[date][id]=!ZL.state.zak.habitLog[date][id];
-    ZL.syncZakData();
+    const done=!!ZL.state.zak.habitLog[date][id];
+    ZL.syncZakData().then(()=>{
+      if(done)return completeHabitTasks(id,date);
+    }).then(syncHabitDueTasks);
     render();
   }
 
@@ -182,13 +282,16 @@
   function renderHabitList(date=selectedDate){
     const log=habitLog(date);
     if(!habits().length)return `<div class="empty slim">Chưa có habit</div>`;
-    return habits().map(h=>`<div class="habit-row">
+    return habits().map(h=>{
+      const due=isHabitDueOnDate(h,date);
+      return `<div class="habit-row ${due&&!log[h.id]?"habit-due":""}">
       <div>
         <div class="item-title">${ZL.escape(h.icon||"•")} ${ZL.escape(h.name)}</div>
-        <div class="item-meta">Mỗi ${Number(h.cycleDays)||1} ngày · streak ${habitStreak(h.id)}</div>
+        <div class="item-meta">Mỗi ${Number(h.cycleDays)||1} ngày · streak ${habitStreak(h.id)}${due&&!log[h.id]?" · tới chu kỳ":""}</div>
       </div>
       <button class="btn sm ${log[h.id]?"primary":""}" data-habit-id="${ZL.escape(h.id)}">${log[h.id]?"Đã xong":"Chọn"}</button>
-    </div>`).join("");
+    </div>`;
+    }).join("");
   }
 
   function monthLabel(monthKey){
@@ -219,7 +322,7 @@
       const icons=doneIconsFor(key);
       const isSelected=key===selectedDate;
       const isToday=key===ZL.today();
-      const missed=key<=ZL.today()&&!icons.length;
+      const missed=key<=ZL.today()&&habits().some(h=>isHabitDueOnDate(h,key));
       cells.push(`<button class="habit-cal-cell ${isSelected?"selected":""} ${isToday?"today":""}" data-select-date="${key}">
         <strong>${day}</strong>
         <div class="habit-cal-icons">${icons.slice(0,5).map(icon=>`<span>${ZL.escape(icon)}</span>`).join("")}${icons.length>5?`<small>+${icons.length-5}</small>`:""}${missed?`<em>⚠</em>`:""}</div>
@@ -412,9 +515,11 @@
 
   ZL.modules.journal={render};
   ZL.on("zak",()=>{
+    syncHabitDueTasks();
     if(ZL.state.route==="journal"&&isJournalEditing())return;
     render();
   });
+  ZL.on("tasks",syncHabitDueTasks);
   ZL.on("route-change",payload=>{
     if(payload?.from==="journal"){
       clearTimeout(saveTimer);

@@ -192,7 +192,7 @@
       <input type="hidden" id="contentMediaProvider" value="${ZL.escape(post.mediaProvider||"")}">
       <input type="hidden" id="contentDriveFileId" value="${ZL.escape(post.driveFileId||"")}">
       <div class="field"><label>Title</label><input id="contentTitle" value="${ZL.escape(post.title)}" placeholder="Exploring New Product Features"></div>
-      <div class="field"><label>Caption</label><textarea id="contentCaption" placeholder="Excited to share...">${ZL.escape(post.caption)}</textarea></div>
+      <div class="field"><label>Caption</label><textarea id="contentCaption" class="content-caption-input" rows="14" style="min-height:340px;height:340px;max-height:520px;" placeholder="Excited to share...">${ZL.escape(post.caption)}</textarea></div>
       <div class="upload-box content-upload-box" id="contentUploadZone" tabindex="0">
         <div id="contentMediaBox">${renderMediaPreview(post)}</div>
         <input id="contentPhoto" value="${ZL.escape(post.photoUrl)}" placeholder="URL ảnh public hoặc link ảnh gốc">

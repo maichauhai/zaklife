@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "firebasePaths": [
+  "version": 2,
+  "activeFirebasePaths": [
     "state",
     "zaklife/data",
     "zaklife/content-calendar",
@@ -12,6 +12,62 @@
     "zaklife/wallet/balances/current",
     "zaklife/vault_encrypted"
   ],
+  "legacyFirebasePaths": [
+    "zaklife/data",
+    "zaklife/data_backups"
+  ],
+  "moduleFirebasePaths": {
+    "meta": "zaklife/meta",
+    "journalEntries": "zaklife/journal/entries",
+    "habitDefinitions": "zaklife/habits/definitions",
+    "habitLogs": "zaklife/habits/logs",
+    "calendarNotes": "zaklife/calendar/notes",
+    "ideaItems": "zaklife/ideas/items",
+    "ideaMeta": "zaklife/ideas/meta",
+    "contentPosts": "zaklife/content-calendar",
+    "tasks": "zaklife/tasks",
+    "quickdock": "zaklife/quickdock",
+    "vaultEncrypted": "zaklife/vault_encrypted",
+    "automation": "zaklife/automation",
+    "agents": "zaklife/agents",
+    "walletBalance": "zaklife/wallet/balances/current",
+    "monsteaPos": "state"
+  },
+  "backupPaths": [
+    "state",
+    "zaklife/meta",
+    "zaklife/data",
+    "zaklife/data_backups",
+    "zaklife/journal/entries",
+    "zaklife/habits/definitions",
+    "zaklife/habits/logs",
+    "zaklife/calendar/notes",
+    "zaklife/ideas/items",
+    "zaklife/ideas/meta",
+    "zaklife/content-calendar",
+    "zaklife/tasks",
+    "zaklife/quickdock",
+    "zaklife/agents",
+    "zaklife/automation",
+    "zaklife/nana_messages",
+    "zaklife/wallet/balances/current",
+    "zaklife/vault_encrypted"
+  ],
+  "writeRules": {
+    "forbidSetOnPaths": [
+      "zaklife",
+      "zaklife/data",
+      "state"
+    ],
+    "allowedRootWriters": [
+      "ops/zaklife-maintenance/scripts/migrate_zaklife_data_v2.py"
+    ],
+    "preferredWriteMethods": [
+      "update",
+      "patch",
+      "transaction"
+    ]
+  },
   "contentPostRequiredFields": [
     "id",
     "title",
