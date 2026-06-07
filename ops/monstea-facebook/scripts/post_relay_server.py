@@ -5,6 +5,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 import post_due_facebook
+try:
+    import post_due_reels
+except Exception:
+    post_due_reels = None
 
 
 def json_response(handler, status, payload):
@@ -56,6 +60,26 @@ class RelayHandler(BaseHTTPRequestHandler):
                     json_response(self, 400, {"ok": False, "error": "Missing post_id"})
                     return
                 result = post_due_facebook.process(source="firebase", dry_run=dry_run, post_id=post_id)
+                json_response(self, 200, {"ok": True, **result})
+                return
+
+            if parsed.path == "/post-due-reels":
+                if post_due_reels is None:
+                    json_response(self, 500, {"ok": False, "error": "Reel worker is not available"})
+                    return
+                result = post_due_reels.process(source="firebase", dry_run=dry_run)
+                json_response(self, 200, {"ok": True, **result})
+                return
+
+            if parsed.path == "/post-reel-now":
+                if post_due_reels is None:
+                    json_response(self, 500, {"ok": False, "error": "Reel worker is not available"})
+                    return
+                post_id = body.get("post_id") or (query.get("post_id") or [""])[0]
+                if not post_id:
+                    json_response(self, 400, {"ok": False, "error": "Missing post_id"})
+                    return
+                result = post_due_reels.process(source="firebase", dry_run=dry_run, post_id=post_id)
                 json_response(self, 200, {"ok": True, **result})
                 return
 

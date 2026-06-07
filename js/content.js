@@ -40,6 +40,10 @@
       thumbStoragePath:"",
       mediaStatus:"empty",
       deleteOriginalAfterPost:true,
+      reelEnabled:false,
+      musicUrl:"",
+      reelScheduledTime:"19:15",
+      reelStatus:"ready",
       scheduledDate:ZL.today(),
       scheduledTime:"09:00",
       status:"draft"
@@ -208,6 +212,23 @@
         </label>
         <p class="content-media-meta">n8n dùng <code>photoUrl</code> hoặc <code>storagePath</code>; sau khi đăng thành công thì xóa <code>storagePath</code>.</p>
       </div>
+      <div class="panel soft-panel content-reel-box">
+        <label class="inline-check">
+          <input type="checkbox" id="contentReelEnabled" ${post.reelEnabled||post.musicUrl||post.music_url?"checked":""}>
+          <span>Tạo Reel từ ảnh bài này</span>
+        </label>
+        <div class="field">
+          <label>Link nhạc Google Drive</label>
+          <input id="contentMusicUrl" value="${ZL.escape(post.musicUrl||post.music_url||"")}" placeholder="Dán link MP3 trên Google Drive">
+        </div>
+        <div class="grid grid-2">
+          <div class="field"><label>Giờ đăng Reel</label><input type="time" id="contentReelTime" value="${ZL.escape(post.reelScheduledTime||"19:15")}"></div>
+          <div class="field"><label>Trạng thái Reel</label><select id="contentReelStatus">
+            ${["ready","posted","failed","disabled"].map(s=>`<option value="${s}" ${(post.reelStatus||"ready")===s?"selected":""}>${({ready:"Ready",posted:"Posted",failed:"Failed",disabled:"Tắt"})[s]}</option>`).join("")}
+          </select></div>
+        </div>
+        <p class="content-media-meta">Reel dùng <code>photoUrl</code> của bài đã posted + <code>musicUrl</code>; VPS render video rồi đăng theo giờ Reel.</p>
+      </div>
       <div class="grid grid-2">
         <div class="field"><label>Schedule Date</label><input type="date" id="contentDate" value="${ZL.escape(post.scheduledDate)}"></div>
         <div class="field"><label>Time</label><input type="time" id="contentTime" value="${ZL.escape(post.scheduledTime)}"></div>
@@ -277,11 +298,16 @@
     const driveFileId=document.getElementById("contentDriveFileId").value.trim();
     const mediaStatus=document.getElementById("contentMediaStatus").value.trim()||(photoUrl?"external_url":"empty");
     const deleteOriginalAfterPost=document.getElementById("contentDeleteOriginal")?.checked!==false;
+    const musicUrl=document.getElementById("contentMusicUrl")?.value.trim()||"";
+    const reelScheduledTime=document.getElementById("contentReelTime")?.value||"19:15";
+    const reelStatus=document.getElementById("contentReelStatus")?.value||"ready";
+    const reelEnabled=(document.getElementById("contentReelEnabled")?.checked||!!musicUrl)&&reelStatus!=="disabled";
     return {
       id,title,caption,message:caption,photoUrl,
       photo_path:photoUrl,image_url:photoUrl,
       storagePath,thumbUrl,thumbStoragePath,
       mediaStatus,mediaMime,mediaSize,mediaProvider,driveFileId,deleteOriginalAfterPost,
+      reelEnabled,musicUrl,music_url:musicUrl,reelScheduledTime,reelStatus,
       scheduledDate,scheduledTime,
       scheduled_at:scheduledIso(scheduledDate,scheduledTime),
       timezone:"Asia/Ho_Chi_Minh",

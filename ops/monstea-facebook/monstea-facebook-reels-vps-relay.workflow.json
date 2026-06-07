@@ -1,0 +1,62 @@
+{
+  "id": "monstea-facebook-reels-vps-relay",
+  "name": "Monstea - Auto Post Facebook Reels (VPS Relay)",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-640, 80]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-640, -80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://172.18.0.1:8787/post-due-reels",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {}
+      },
+      "id": "post-due-reels-relay",
+      "name": "Post Due Facebook Reels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-300, 0]
+    }
+  ],
+  "connections": {
+    "Manual Test": {
+      "main": [[{"node": "Post Due Facebook Reels", "type": "main", "index": 0}]]
+    },
+    "Every 15 Minutes": {
+      "main": [[{"node": "Post Due Facebook Reels", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Ho_Chi_Minh"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "monstea-facebook-reels-vps-relay-v1"
+}
