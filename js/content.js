@@ -42,6 +42,9 @@
       deleteOriginalAfterPost:true,
       reelEnabled:false,
       musicUrl:"",
+      reelCaption:"",
+      reelOverlayText:"",
+      reelDuration:14,
       reelScheduledTime:"19:15",
       reelStatus:"ready",
       scheduledDate:ZL.today(),
@@ -221,6 +224,14 @@
           <label>Link nhạc Google Drive</label>
           <input id="contentMusicUrl" value="${ZL.escape(post.musicUrl||post.music_url||"")}" placeholder="Dán link MP3 trên Google Drive">
         </div>
+        <div class="field">
+          <label>Caption Reel</label>
+          <textarea id="contentReelCaption" rows="4" placeholder="Caption ngắn riêng cho Reel">${ZL.escape(post.reelCaption||post.reel_caption||"")}</textarea>
+        </div>
+        <div class="field">
+          <label>Chữ overlay trên Reel</label>
+          <input id="contentReelOverlay" value="${ZL.escape(post.reelOverlayText||post.reel_overlay_text||"")}" placeholder="VD: Chủ nhật uống gì?">
+        </div>
         <div class="grid grid-2">
           <div class="field"><label>Giờ đăng Reel</label><input type="time" id="contentReelTime" value="${ZL.escape(post.reelScheduledTime||"19:15")}"></div>
           <div class="field"><label>Trạng thái Reel</label><select id="contentReelStatus">
@@ -299,6 +310,8 @@
     const mediaStatus=document.getElementById("contentMediaStatus").value.trim()||(photoUrl?"external_url":"empty");
     const deleteOriginalAfterPost=document.getElementById("contentDeleteOriginal")?.checked!==false;
     const musicUrl=document.getElementById("contentMusicUrl")?.value.trim()||"";
+    const reelCaption=document.getElementById("contentReelCaption")?.value.trim()||"";
+    const reelOverlayText=document.getElementById("contentReelOverlay")?.value.trim()||"";
     const reelScheduledTime=document.getElementById("contentReelTime")?.value||"19:15";
     const reelStatus=document.getElementById("contentReelStatus")?.value||"ready";
     const reelEnabled=(document.getElementById("contentReelEnabled")?.checked||!!musicUrl)&&reelStatus!=="disabled";
@@ -307,7 +320,10 @@
       photo_path:photoUrl,image_url:photoUrl,
       storagePath,thumbUrl,thumbStoragePath,
       mediaStatus,mediaMime,mediaSize,mediaProvider,driveFileId,deleteOriginalAfterPost,
-      reelEnabled,musicUrl,music_url:musicUrl,reelScheduledTime,reelStatus,
+      reelEnabled,musicUrl,music_url:musicUrl,
+      reelCaption,reel_caption:reelCaption,
+      reelOverlayText,reel_overlay_text:reelOverlayText,
+      reelDuration:14,reelScheduledTime,reelStatus,
       scheduledDate,scheduledTime,
       scheduled_at:scheduledIso(scheduledDate,scheduledTime),
       timezone:"Asia/Ho_Chi_Minh",

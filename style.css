@@ -678,6 +678,7 @@ textarea.tall{min-height:272px}
 }
 .content-reel-box .inline-check{margin-bottom:10px}
 .content-reel-box input,.content-reel-box select{min-height:38px}
+.content-reel-box textarea{min-height:92px;line-height:1.45;resize:vertical}
 .content-media-meta{margin:0;color:var(--text-muted);font-size:.72rem;line-height:1.45}
 .content-media-meta code{color:var(--accent-light);background:rgba(16,185,129,.08);border-radius:5px;padding:1px 4px}
 .tasks-layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px;align-items:start}

@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import textwrap
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta
@@ -195,15 +196,62 @@ def upload_reel_binary(upload_url, token, video_path):
         return json.loads(text) if text else {}
 
 
-def render_reel_video(image_path, audio_path, duration=14):
+def clean_overlay_text(value):
+    value = re.sub(r"[^\w\sÀ-ỹà-ỹ?!.:,/-]", "", str(value or ""), flags=re.UNICODE)
+    value = re.sub(r"\s+", " ", value).strip(" -•\t\r\n")
+    return value[:72]
+
+
+def default_overlay_text(post):
+    explicit = post.get("reelOverlayText") or post.get("reel_overlay_text")
+    if explicit:
+        return clean_overlay_text(explicit)
+    caption = post.get("caption") or post.get("message") or ""
+    for line in str(caption).replace("\r\n", "\n").split("\n"):
+        text = clean_overlay_text(line)
+        if text:
+            return text
+    return ""
+
+
+def wrapped_overlay_text(value):
+    text = clean_overlay_text(value)
+    if not text:
+        return ""
+    return "\n".join(textwrap.wrap(text, width=18, max_lines=3, placeholder="..."))
+
+
+def render_reel_video(image_path, audio_path, duration=14, overlay_text=""):
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise RuntimeError("ffmpeg is required to render Reel video")
     out = Path(tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name)
-    vf = "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,format=yuv420p"
+    duration = max(8, min(20, int(duration or 14)))
+    overlay_file = None
+    vf_parts = [
+        "scale=1188:2112:force_original_aspect_ratio=increase",
+        "crop=1080:1920:x='(iw-1080)/2+((iw-1080)/2)*0.18*sin(t*0.7)':y='(ih-1920)/2+((ih-1920)/2)*0.16*cos(t*0.5)'",
+        "fade=t=in:st=0:d=0.35",
+        f"fade=t=out:st={max(0, duration - 0.35):.2f}:d=0.35",
+    ]
+    overlay = wrapped_overlay_text(overlay_text)
+    if overlay:
+        overlay_file = Path(tempfile.NamedTemporaryFile(delete=False, suffix=".txt").name)
+        overlay_file.write_text(overlay, encoding="utf-8")
+        vf_parts.append(
+            "drawtext="
+            "fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
+            f"textfile={overlay_file.as_posix()}:"
+            "fontcolor=white:fontsize=62:line_spacing=8:"
+            "box=1:boxcolor=black@0.46:boxborderw=24:"
+            "x=58:y=150"
+        )
+    vf_parts.append("format=yuv420p")
+    vf = ",".join(vf_parts)
     cmd = [
         ffmpeg,
         "-y",
+        "-nostdin",
         "-loop",
         "1",
         "-i",
@@ -228,6 +276,11 @@ def render_reel_video(image_path, audio_path, duration=14):
         str(out),
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+    if overlay_file:
+        try:
+            overlay_file.unlink()
+        except OSError:
+            pass
     if result.returncode != 0:
         try:
             out.unlink()
@@ -252,7 +305,12 @@ def publish_reel(creds, post):
     try:
         image_path = download_media(image_ref, ".jpg")
         audio_path = download_media(music_ref, ".mp3")
-        video_path = render_reel_video(image_path, audio_path, int(post.get("reelDuration") or 14))
+        video_path = render_reel_video(
+            image_path,
+            audio_path,
+            int(post.get("reelDuration") or post.get("reel_duration") or 14),
+            default_overlay_text(post),
+        )
         start = post_form(
             f"{base}/{page_id}/video_reels",
             {"access_token": token, "upload_phase": "start"},
@@ -269,7 +327,7 @@ def publish_reel(creds, post):
                 "upload_phase": "finish",
                 "video_id": video_id,
                 "video_state": "PUBLISHED",
-                "description": post.get("caption") or post.get("message") or "",
+                "description": post.get("reelCaption") or post.get("reel_caption") or post.get("caption") or post.get("message") or "",
             },
         )
         return {"video_id": video_id, "finish": finish}
