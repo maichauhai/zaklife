@@ -57,10 +57,39 @@
   }
 
   function noteRows(){
+    return notesForRead();
+  }
+
+  function notesForRead(){
     const raw=(ZL.state.pos||{}).dailyNotes;
-    if(Array.isArray(raw))return raw.map((n,idx)=>n?{...n,_path:String(idx)}:null).filter(Boolean);
-    if(raw&&typeof raw==="object")return Object.entries(raw).map(([key,n])=>n?{...n,_path:key}:null).filter(Boolean);
-    return [];
+    const rows=Array.isArray(raw)
+      ? raw.map((n,idx)=>n?{...n,_path:String(idx)}:null)
+      : raw&&typeof raw==="object"
+        ? Object.entries(raw).map(([key,n])=>n?{...n,_path:key}:null)
+        : [];
+    return rows.filter(n=>n&&!n._deleted);
+  }
+
+  function notesForWrite(){
+    return notesForRead().map(({_path,...note})=>note);
+  }
+
+  function noteKey(note){
+    return note?String(note.syncId||note.id||note._path||""):"";
+  }
+
+  function writeNoteList(list){
+    ZL.state.pos=ZL.state.pos||{};
+    ZL.state.pos.dailyNotes=list;
+    ZL.emit("pos");
+    ZL.emit("dashboard");
+  }
+
+  function findWriteIndex(list,path){
+    const current=notesForRead().find(n=>n._path===String(path)||String(n.syncId||"")===String(path)||String(n.id||"")===String(path));
+    if(!current)return -1;
+    const key=noteKey(current);
+    return list.findIndex(n=>noteKey(n)===key);
   }
 
   function noteTime(){
@@ -68,17 +97,16 @@
   }
 
   function writeNote(path,patch){
+    const list=notesForWrite();
+    const idx=findWriteIndex(list,path);
+    if(idx<0)return Promise.resolve(false);
+    list[idx]={...list[idx],...patch,_lastModified:Date.now()};
+    writeNoteList(list);
     if(!ZL.fb.db){
-      const raw=(ZL.state.pos.dailyNotes||[]);
-      const list=Array.isArray(raw)?raw.slice():ZL.normalizeList(raw);
-      const idx=Number(path);
-      if(Number.isFinite(idx)&&list[idx])list[idx]={...list[idx],...patch};
-      ZL.state.pos.dailyNotes=list;
-      ZL.emit("dashboard");
       ZL.toast("Đã cập nhật local");
       return Promise.resolve();
     }
-    return ZL.fb.db.ref("state/dailyNotes/"+path).update(patch);
+    return ZL.fb.db.ref("state/dailyNotes").set(list);
   }
 
   function toggleNote(path){
@@ -126,23 +154,25 @@
   function addNote(text){
     const value=String(text||"").trim();
     if(!value){ZL.toast("Nhập nội dung ghi chú");return;}
-    const note={id:Date.now(),text:value,time:noteTime(),date:ZL.today(),done:false};
+    const now=Date.now();
+    const note={
+      id:now,
+      syncId:`zak-note-${now}-${Math.random().toString(36).slice(2,8)}`,
+      _lastModified:now,
+      text:value,
+      time:noteTime(),
+      date:ZL.today(),
+      done:false,
+      doneDate:null
+    };
+    const list=notesForWrite();
+    list.push(note);
+    writeNoteList(list);
     if(!ZL.fb.db){
-      const list=noteRows().map(({_path,...n})=>n);
-      list.push(note);
-      ZL.state.pos.dailyNotes=list;
-      ZL.emit("dashboard");
       ZL.toast("Đã thêm local");
       return;
     }
-    const raw=(ZL.state.pos||{}).dailyNotes;
-    if(Array.isArray(raw)){
-      const list=raw.slice();
-      list.push(note);
-      ZL.fb.db.ref("state/dailyNotes").set(list).then(()=>ZL.toast("Đã thêm ghi chú"));
-    }else{
-      ZL.fb.db.ref("state/dailyNotes").push(note).then(()=>ZL.toast("Đã thêm ghi chú"));
-    }
+    return ZL.fb.db.ref("state/dailyNotes").set(list).then(()=>ZL.toast("Đã thêm ghi chú"));
   }
 
   function renderMonsteaToday(){
@@ -458,7 +488,7 @@
     const corpus=[];
     taskRows().forEach(t=>corpus.push({type:"Task",route:"tasks",title:t.title||"Task",detail:`${t.category||"personal"} · ${t.status||"todo"} · ${t.dueDate||"no date"}`,text:`${t.title||""} ${t.category||""} ${t.status||""} ${t.priority||""}`}));
     ZL.contentPosts().forEach(p=>corpus.push({type:"Content",route:"content",title:p.title||"Content",detail:`${p.scheduledDate||""} ${p.scheduledTime||""} · ${p.status||""}`,text:`${p.title||""} ${p.caption||""} ${p.status||""}`}));
-    (ZL.state.zak.ideas||[]).forEach(i=>corpus.push({type:"Idea",route:"ideas",title:i.title||"Idea",detail:(i.tags||[]).join(", ")||String(i.created||"").slice(0,10),text:`${i.title||""} ${i.note||""} ${(i.tags||[]).join(" ")} ${(i.links||[]).join(" ")}`}));
+    (ZL.state.zak.ideas||[]).filter(i=>i&&!i._deleted).forEach(i=>corpus.push({type:"Idea",route:"ideas",title:i.title||"Idea",detail:(i.tags||[]).join(", ")||String(i.created||"").slice(0,10),text:`${i.title||""} ${i.note||""} ${(i.tags||[]).join(" ")} ${(i.links||[]).join(" ")}`}));
     entryRows().forEach(e=>corpus.push({type:"Journal",route:"journal",title:`Journal ${e.date}`,detail:e.moodLabel||"Daily note",text:`${e.date} ${e.text||""} ${e.brainDump||""} ${e.win||""} ${(e.gratitude||[]).join(" ")}`}));
     noteRows().forEach(n=>corpus.push({type:"Monstea note",route:"dashboard",title:n.text||"Ghi chú Monstea",detail:`${n.date||""} ${n.time||""}`,text:`${n.text||""} ${n.date||""}`}));
     return corpus;

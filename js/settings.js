@@ -109,7 +109,7 @@
     const entryCount=Object.keys(zak.entries||{}).length;
     const habitLogDays=Object.keys(zak.habitLog||{}).length;
     const habitCount=Array.isArray(zak.habits)?zak.habits.length:0;
-    const ideaCount=Array.isArray(zak.ideas)?zak.ideas.length:0;
+    const ideaCount=Array.isArray(zak.ideas)?zak.ideas.filter(i=>i&&!i._deleted).length:0;
     root.innerHTML=`
       <div class="grid grid-4" style="margin-bottom:16px">
         <div class="stat-card"><div class="stat-label">Firebase</div><div class="stat-value ${ZL.fb.ready?"accent-value":"danger-value"}">${ZL.fb.ready?"Ready":"Offline"}</div><div class="stat-note">RTDB</div></div>

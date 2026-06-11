@@ -168,10 +168,26 @@
     return out;
   }
 
+  function listItemStamp(item){
+    const direct=Number(item&&item._lastModified);
+    if(Number.isFinite(direct)&&direct>0)return direct;
+    const updated=Date.parse(item&&item.updatedAt||"");
+    if(Number.isFinite(updated))return updated;
+    const created=Date.parse(item&&item.created||"");
+    if(Number.isFinite(created))return created;
+    return Number(item&&item.id)||0;
+  }
+
   function mergeListById(remoteList,localList){
     const map=new Map();
-    (Array.isArray(remoteList)?remoteList:[]).filter(Boolean).forEach(item=>map.set(String(item.id||item.name||map.size),item));
-    (Array.isArray(localList)?localList:[]).filter(Boolean).forEach(item=>map.set(String(item.id||item.name||map.size),item));
+    const put=item=>{
+      if(!item)return;
+      const key=String(item.id||item.name||map.size);
+      const old=map.get(key);
+      if(!old||listItemStamp(item)>=listItemStamp(old))map.set(key,item);
+    };
+    (Array.isArray(remoteList)?remoteList:[]).forEach(put);
+    (Array.isArray(localList)?localList:[]).forEach(put);
     return [...map.values()];
   }
 

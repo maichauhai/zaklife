@@ -9,6 +9,10 @@
     return ZL.state.zak.ideas;
   }
 
+  function activeIdeas(){
+    return ideas().filter(idea=>idea&&!idea._deleted);
+  }
+
   function renderImagePreview(){
     return `<div class="image-preview">
       ${ideaImages.map((src,i)=>`<div class="thumb"><img src="${src}" alt="" data-open-image><button data-remove-image="${i}">×</button></div>`).join("")}
@@ -56,6 +60,7 @@
       images:[...ideaImages],
       tags:[...selectedTags],
       created:ZL.nowIso(),
+      _lastModified:Date.now(),
       synced:false
     });
     ZL.state.zak.nextIdeaId=next+1;
@@ -68,14 +73,18 @@
 
   function deleteIdea(id){
     if(!confirm("Xóa ý tưởng này?"))return;
-    ZL.state.zak.ideas=ideas().filter(i=>String(i.id)!==String(id));
+    const now=Date.now();
+    ZL.state.zak.ideas=ideas().map(idea=>String(idea.id)===String(id)
+      ? {...idea,_deleted:true,deletedAt:ZL.nowIso(),_lastModified:now,images:[]}
+      : idea
+    );
     ZL.syncZakData();
     ZL.toast("Đã xóa");
     render();
   }
 
   function exportIdeas(){
-    const unsynced=ideas().filter(i=>!i.synced);
+    const unsynced=activeIdeas().filter(i=>!i.synced);
     if(!unsynced.length){ZL.toast("Không có ý tưởng mới để export");return;}
     let md="# Ideas Inbox\n";
     md+=`> Exported: ${new Date().toLocaleString("vi-VN")}\n\n`;
@@ -101,7 +110,7 @@
   }
 
   function renderList(){
-    const list=ideas().slice().sort((a,b)=>String(b.created||"").localeCompare(String(a.created||"")));
+    const list=activeIdeas().slice().sort((a,b)=>String(b.created||"").localeCompare(String(a.created||"")));
     if(!list.length)return `<div class="empty">Chưa có ý tưởng</div>`;
     return list.map(idea=>{
       const tags=(idea.tags||[]).map(t=>`<span class="tag selected">${ZL.escape(t)}</span>`).join("");
@@ -174,7 +183,7 @@
     root.innerHTML=`
       <div class="layout-2">
         <div class="panel">
-          <div class="panel-title"><div><h2>Ý tưởng mới</h2><p>${ideas().length} ý tưởng</p></div></div>
+          <div class="panel-title"><div><h2>Ý tưởng mới</h2><p>${activeIdeas().length} ý tưởng</p></div></div>
           <div class="field compact"><label>Tiêu đề</label><input id="ideaTitle" placeholder="Tên ý tưởng"></div>
           <div class="field"><label>Nội dung</label><div id="ideaPasteZone" class="paste-zone" contenteditable="true"></div></div>
           <div class="tag-picker">${TAGS.map(tag=>`<button class="tag ${selectedTags.has(tag)?"selected":""}" data-tag="${ZL.escape(tag)}">${ZL.escape(tag)}</button>`).join("")}</div>
