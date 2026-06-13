@@ -17,8 +17,11 @@
   let search="";
   let categoryFilter="";
   let editingId="";
+  const DONE_RETENTION_DAYS=3;
+  const DONE_RETENTION_MS=DONE_RETENTION_DAYS*24*60*60*1000;
+  let cleanupDoneRunning=false;
 
-  function tasks(){
+  function allTasks(){
     return ZL.normalizeList(ZL.state.tasks).map(t=>({
       status:"todo",
       category:"personal",
@@ -26,6 +29,37 @@
       starred:false,
       ...t
     }));
+  }
+
+  function doneTimestamp(task){
+    if(task.status!=="done")return 0;
+    const raw=task.completedAt||task.doneAt||task.updatedAt||"";
+    if(!raw)return 0;
+    const time=new Date(raw).getTime();
+    return Number.isFinite(time)?time:0;
+  }
+
+  function isExpiredDone(task){
+    const time=doneTimestamp(task);
+    return Boolean(time&&Date.now()-time>=DONE_RETENTION_MS);
+  }
+
+  function tasks(){
+    return allTasks().filter(t=>!isExpiredDone(t));
+  }
+
+  function normalizePatch(id,patch){
+    const old=allTasks().find(t=>String(t.id)===String(id))||{};
+    const next={...patch};
+    if(Object.prototype.hasOwnProperty.call(next,"status")){
+      if(next.status==="done"){
+        next.completedAt=next.completedAt||old.completedAt||old.doneAt||ZL.nowIso();
+      }else{
+        next.completedAt=null;
+        next.doneAt=null;
+      }
+    }
+    return {...next,updatedAt:ZL.nowIso()};
   }
 
   function taskRef(id){
@@ -44,13 +78,32 @@
   }
 
   function patchTask(id,patch){
+    const nextPatch=normalizePatch(id,patch);
     if(!ZL.fb.db){
       ZL.state.tasks=ZL.state.tasks||{};
-      ZL.state.tasks[id]={...(ZL.state.tasks[id]||{}),id,...patch};
+      ZL.state.tasks[id]={...(ZL.state.tasks[id]||{}),id,...nextPatch};
       ZL.emit("tasks");
       return Promise.resolve();
     }
-    return taskRef(id).update({...patch,updatedAt:ZL.nowIso()});
+    return taskRef(id).update(nextPatch);
+  }
+
+  function cleanupExpiredDoneTasks(){
+    if(cleanupDoneRunning)return;
+    const expired=allTasks().filter(isExpiredDone);
+    if(!expired.length)return;
+    cleanupDoneRunning=true;
+    if(!ZL.fb.db){
+      ZL.state.tasks=ZL.state.tasks||{};
+      expired.forEach(task=>delete ZL.state.tasks[task.id]);
+      cleanupDoneRunning=false;
+      ZL.emit("tasks");
+      ZL.emit("dashboard");
+      return;
+    }
+    const updates={};
+    expired.forEach(task=>{updates[task.id]=null;});
+    ZL.fb.db.ref("zaklife/tasks").update(updates).finally(()=>{cleanupDoneRunning=false;});
   }
 
   function deleteTask(id){
@@ -314,6 +367,7 @@
   function render(){
     const root=document.getElementById("tasksRoot");
     if(!root)return;
+    cleanupExpiredDoneTasks();
     const list=filteredTasks();
     root.innerHTML=`
       <div class="tasks-layout">

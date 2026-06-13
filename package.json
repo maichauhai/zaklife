@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "private": true,
   "scripts": {
-    "check:js": "node --check js/app.js && node --check js/firebase-init.js && node --check js/dashboard.js && node --check js/content.js",
+    "check:js": "node --check js/app.js && node --check js/firebase-init.js && node --check js/supabase-init.js && node --check js/dashboard.js && node --check js/content.js && node --check js/crm.js && node --check js/health.js",
     "ci:secrets": "node tools/ci/check-secrets.js",
     "ci:schema": "node tools/ci/check-schema.js",
     "test:smoke": "playwright test"

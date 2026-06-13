@@ -1,11 +1,13 @@
 (function(){
   const ZL=window.ZL;
   const ROUTES={
+    crm:{title:"CRM Leads",subtitle:"Quan ly lead, deal, du an"},
     dashboard:{title:"Dashboard",subtitle:"Tổng quan hôm nay"},
     pos:{title:"Monstea POS",subtitle:"Theo dõi quán từ xa"},
     content:{title:"Content Manager",subtitle:"Lịch bài fanpage"},
     tasks:{title:"Tasks",subtitle:"Kanban công việc"},
     journal:{title:"Journal & Habits",subtitle:"Nhật ký và thói quen"},
+    health:{title:"Health Tracker",subtitle:"Số đo body, ảnh tiến trình và PR gym"},
     ideas:{title:"Ideas",subtitle:"Inbox ý tưởng"},
     vault:{title:"Vault",subtitle:"Dữ liệu riêng"},
     quickdock:{title:"Quick Dock",subtitle:"Link, lệnh và ghi chú nhanh"},

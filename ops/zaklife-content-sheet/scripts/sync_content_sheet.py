@@ -35,6 +35,13 @@ FIELD_ALIASES = {
     "platform": ["platform", "kenh"],
     "content_type": ["content_type", "type", "loai", "dinh_dang"],
     "notes": ["notes", "note", "ghi_chu"],
+    "reel_enabled": ["reel_enabled", "reel", "tao_reel", "create_reel"],
+    "music_url": ["music_url", "musicurl", "music", "nhac", "link_nhac", "link_nhac_google_drive"],
+    "reel_caption": ["reel_caption", "caption_reel", "reelcaption"],
+    "reel_overlay_text": ["reel_overlay_text", "overlay_text", "chu_overlay", "chu_reel"],
+    "reel_scheduled_time": ["reel_scheduled_time", "reel_time", "gio_reel", "gio_dang_reel"],
+    "reel_status": ["reel_status", "trang_thai_reel"],
+    "reel_duration": ["reel_duration", "duration", "thoi_luong_reel"],
 }
 
 
@@ -167,6 +174,11 @@ def parse_time(value):
     raise ValueError(f"Invalid scheduled_time: {value}")
 
 
+def parse_bool(value):
+    text = normalize_key(value)
+    return text in {"1", "true", "yes", "y", "on", "ready", "reel", "tao", "tao_reel", "co"}
+
+
 def parse_datetime(value):
     raw = str(value or "").strip()
     if not raw:
@@ -259,6 +271,20 @@ def build_post(args, row):
     source_key = row_source_key(args, row, post_id)
     media_provider = "google_drive" if drive_file_id else ("external_url" if image_url else "")
     media_status = "external_url" if image_url else "empty"
+    music_url = get_field(row, "music_url")
+    reel_caption = get_field(row, "reel_caption")
+    reel_overlay_text = get_field(row, "reel_overlay_text")
+    reel_scheduled_time_raw = get_field(row, "reel_scheduled_time")
+    reel_scheduled_time = parse_time(reel_scheduled_time_raw) if reel_scheduled_time_raw else "19:15"
+    reel_status = normalize_key(get_field(row, "reel_status")) or "ready"
+    reel_enabled = (
+        parse_bool(get_field(row, "reel_enabled"))
+        or bool(music_url or reel_caption or reel_overlay_text)
+    ) and reel_status != "disabled"
+    try:
+        reel_duration = int(float(get_field(row, "reel_duration") or 14))
+    except ValueError:
+        reel_duration = 14
     now = now_iso()
     return {
         "id": post_id,
@@ -280,6 +306,16 @@ def build_post(args, row):
         "status": args.target_status,
         "platform": get_field(row, "platform") or "facebook",
         "content_type": get_field(row, "content_type") or "post",
+        "reelEnabled": reel_enabled,
+        "musicUrl": music_url,
+        "music_url": music_url,
+        "reelCaption": reel_caption,
+        "reel_caption": reel_caption,
+        "reelOverlayText": reel_overlay_text,
+        "reel_overlay_text": reel_overlay_text,
+        "reelScheduledTime": reel_scheduled_time,
+        "reelStatus": reel_status if reel_enabled else "disabled",
+        "reelDuration": reel_duration,
         "sourceNotes": get_field(row, "notes"),
         "sourceStatus": get_field(row, "status"),
         "sourceKey": source_key,

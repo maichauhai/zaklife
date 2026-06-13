@@ -509,13 +509,13 @@
         <input id="dashboardSearchInput" value="${ZL.escape(dashboardSearch)}" placeholder="Tìm task, idea, journal, content...">
         ${q?`<button class="btn sm" id="dashboardSearchClear">Xóa</button>`:""}
       </div>
-      <div class="search-results">
-        ${q.length<2?`<div class="empty slim">Nhập ít nhất 2 ký tự để tìm.</div>`:results.length?results.map(item=>`<button class="search-result" data-route-jump="${ZL.escape(item.route)}">
+      ${q.length>=2?`<div class="search-results">
+        ${results.length?results.map(item=>`<button class="search-result" data-route-jump="${ZL.escape(item.route)}">
           <span class="search-type">${ZL.escape(item.type)}</span>
           <strong>${ZL.escape(item.title)}</strong>
           <em>${ZL.escape(item.detail||"")}</em>
         </button>`).join(""):`<div class="empty slim">Không tìm thấy kết quả.</div>`}
-      </div>
+      </div>`:""}
     </div>`;
   }
 

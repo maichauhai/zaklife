@@ -8,10 +8,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260606-habit-task1">
+<link rel="stylesheet" href="style.css?v=20260613-health">
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <div class="app-shell">
@@ -42,6 +43,9 @@
       <button class="nav-item" data-route="journal">
         <span class="nav-icon">◷</span><span class="nav-label">Journal & Habits</span>
       </button>
+      <button class="nav-item" data-route="health">
+        <span class="nav-icon">⚡</span><span class="nav-label">Health Tracker</span>
+      </button>
       <button class="nav-item" data-route="ideas">
         <span class="nav-icon">✦</span><span class="nav-label">Ideas</span>
       </button>
@@ -51,6 +55,11 @@
       <button class="nav-item" data-route="quickdock">
         <span class="nav-icon">⌘</span><span class="nav-label">Quick Dock</span>
       </button>
+      <div class="nav-section">Kinh doanh</div>
+      <button class="nav-item" data-route="crm">
+        <span class="nav-icon">▦</span><span class="nav-label">CRM</span>
+      </button>
+      <div class="nav-section">He thong</div>
       <button class="nav-item" data-route="settings">
         <span class="nav-icon">⚙</span><span class="nav-label">Settings</span>
       </button>
@@ -97,6 +106,10 @@
       <div id="journalRoot"></div>
     </section>
 
+    <section class="view" id="view-health" data-title="Health Tracker" data-subtitle="Số đo body, ảnh tiến trình và PR gym">
+      <div id="healthRoot"></div>
+    </section>
+
     <section class="view" id="view-ideas" data-title="Ideas" data-subtitle="Inbox ý tưởng">
       <div id="ideasRoot"></div>
     </section>
@@ -109,6 +122,10 @@
       <div id="quickdockRoot"></div>
     </section>
 
+    <section class="view" id="view-crm" data-title="CRM Leads" data-subtitle="Quan ly lead, deal, du an">
+      <div id="crmRoot"></div>
+    </section>
+
     <section class="view" id="view-settings" data-title="Settings" data-subtitle="Cấu hình">
       <div id="settingsRoot"></div>
     </section>
@@ -117,16 +134,19 @@
 
 <div class="toast-wrap" id="toastWrap"></div>
 
-<script src="js/firebase-init.js?v=20260606-habit-task1"></script>
-<script src="js/dashboard.js?v=20260606-habit-task1"></script>
-<script src="js/monstea-pos.js?v=20260606-habit-task1"></script>
-<script src="js/content.js?v=20260606-habit-task1"></script>
-<script src="js/tasks.js?v=20260606-habit-task1"></script>
-<script src="js/journal.js?v=20260606-habit-task1"></script>
-<script src="js/ideas.js?v=20260606-habit-task1"></script>
-<script src="js/vault.js?v=20260606-habit-task1"></script>
-<script src="js/quickdock.js?v=20260606-habit-task1"></script>
-<script src="js/settings.js?v=20260606-habit-task1"></script>
-<script src="js/app.js?v=20260606-habit-task1"></script>
+<script src="js/firebase-init.js?v=20260613-task-cleanup"></script>
+<script src="js/supabase-init.js?v=20260613-task-cleanup"></script>
+<script src="js/dashboard.js?v=20260613-task-cleanup"></script>
+<script src="js/monstea-pos.js?v=20260613-task-cleanup"></script>
+<script src="js/content.js?v=20260613-task-cleanup"></script>
+<script src="js/tasks.js?v=20260613-task-cleanup"></script>
+<script src="js/journal.js?v=20260613-task-cleanup"></script>
+<script src="js/health.js?v=20260613-health"></script>
+<script src="js/ideas.js?v=20260613-task-cleanup"></script>
+<script src="js/vault.js?v=20260613-task-cleanup"></script>
+<script src="js/quickdock.js?v=20260613-task-cleanup"></script>
+<script src="js/crm.js?v=20260613-task-cleanup"></script>
+<script src="js/settings.js?v=20260613-task-cleanup"></script>
+<script src="js/app.js?v=20260613-health"></script>
 </body>
 </html>

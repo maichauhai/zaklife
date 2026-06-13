@@ -13,13 +13,13 @@ https://docs.google.com/spreadsheets/d/1A1-QfM_hk-5_uGiZLrVu2c7ZcJetdqqCH-lfan43
 Use a tab named `Content` and keep these headers on row 1:
 
 ```csv
-id,title,caption,image_url,thumb_url,scheduled_date,scheduled_time,status,platform,content_type,notes
+id,title,caption,image_url,thumb_url,scheduled_date,scheduled_time,status,platform,content_type,notes,reel_enabled,music_url,reel_caption,reel_overlay_text,reel_scheduled_time,reel_status,reel_duration
 ```
 
 Minimum useful row:
 
 ```csv
-monstea-2026-06-07-01,Combo chien cuoi tuan,"Caption o day",https://drive.google.com/file/d/FILE_ID/view,2026-06-07,17:45,ready,facebook,post,""
+monstea-2026-06-07-01,Combo chien cuoi tuan,"Caption o day",https://drive.google.com/file/d/FILE_ID/view,,2026-06-07,17:45,ready,facebook,post,"Can anh mon",true,https://drive.google.com/file/d/MUSIC_ID/view,"Caption Reel","Chu overlay",19:15,ready,14
 ```
 
 ## Status rule
@@ -104,3 +104,13 @@ powershell -ExecutionPolicy Bypass -File .\ops\zaklife-content-sheet\send-conten
 ```
 
 While testing the webhook in n8n, add `-Test` to send to `/webhook-test/...`.
+
+## Optional Reel fields
+
+- `reel_enabled`: `true` to create a Reel from the posted image.
+- `music_url`: Google Drive MP3 link. Can be blank until anh adds music.
+- `reel_caption`: short caption for Reel.
+- `reel_overlay_text`: short overlay text shown on Reel.
+- `reel_scheduled_time`: time to publish Reel, usually after the feed post.
+- `reel_status`: `ready`, `posted`, `failed`, or `disabled`.
+- `reel_duration`: default `14`.

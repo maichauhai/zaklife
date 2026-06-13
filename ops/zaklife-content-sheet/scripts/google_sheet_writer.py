@@ -12,7 +12,8 @@ from cryptography.hazmat.primitives.asymmetric import padding
 
 DEFAULT_SERVICE_ACCOUNT = r"C:\Users\pc\Desktop\Multiagent\monstea-2446b3c36803.json"
 DEFAULT_SHEET_ID = "1A1-QfM_hk-5_uGiZLrVu2c7ZcJetdqqCH-lfan430bU"
-DEFAULT_RANGE = "Content!A:K"
+DEFAULT_RANGE = "Content!A:R"
+DEFAULT_HEADER_RANGE = "Content!A1:R1"
 
 HEADERS = [
     "id",
@@ -26,6 +27,13 @@ HEADERS = [
     "platform",
     "content_type",
     "notes",
+    "reel_enabled",
+    "music_url",
+    "reel_caption",
+    "reel_overlay_text",
+    "reel_scheduled_time",
+    "reel_status",
+    "reel_duration",
 ]
 
 
@@ -96,6 +104,10 @@ def normalize_post(post):
         normalized["platform"] = "facebook"
     if not normalized["content_type"]:
         normalized["content_type"] = "post"
+    if not normalized["reel_status"]:
+        normalized["reel_status"] = "ready" if normalized["reel_enabled"] else ""
+    if not normalized["reel_duration"]:
+        normalized["reel_duration"] = "14" if normalized["reel_enabled"] else ""
     return normalized
 
 
@@ -117,6 +129,7 @@ def append_posts(payload, dry_run=False, sheet_id=DEFAULT_SHEET_ID):
     if dry_run:
         return {"status": "ok", "dry_run": True, "appended": 0, "would_append": len(values), "ids": [p["id"] for p in posts]}
     token = access_token()
+    ensure_headers(token, sheet_id)
     quoted_range = urllib.parse.quote(DEFAULT_RANGE, safe="")
     url = (
         f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{quoted_range}:append"
@@ -130,3 +143,12 @@ def append_posts(payload, dry_run=False, sheet_id=DEFAULT_SHEET_ID):
         "ids": [p["id"] for p in posts],
         "updates": result.get("updates", {}),
     }
+
+
+def ensure_headers(token, sheet_id=DEFAULT_SHEET_ID):
+    quoted_range = urllib.parse.quote(DEFAULT_HEADER_RANGE, safe="")
+    url = (
+        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{quoted_range}"
+        "?valueInputOption=RAW"
+    )
+    return sheets_request("PUT", url, token, {"values": [HEADERS]})
