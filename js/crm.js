@@ -299,7 +299,10 @@
         </div>
         <div class="field"><label>Tags</label><input id="crmEditTags" value="${ZL.escape((row.tags||[]).join(", "))}" placeholder="F&B, POS, Automation"></div>
         <div class="field"><label>Ghi chú / sở thích / lưu ý khách</label><textarea id="crmEditNote" placeholder="Khách quan tâm gì, tính cách ra sao, ngân sách, điều cần tránh...">${ZL.escape(row.detail||"")}</textarea></div>
-        <button class="btn primary" id="crmSaveDetail" type="submit">Lưu thay đổi</button>
+        <div class="crm-detail-actions">
+          <button class="btn primary" id="crmSaveDetail" type="submit">Lưu thay đổi</button>
+          <button class="btn danger" id="crmDeleteLead" type="button">Xóa lead</button>
+        </div>
       </form>
       <h3>Hoạt động gần đây</h3>
       <div class="crm-timeline">
@@ -311,7 +314,6 @@
       <div class="crm-quick-actions">
         <button class="btn sm" data-crm-action="zalo">Ghi log Zalo</button>
         <button class="btn sm" data-crm-action="task">Tạo task</button>
-        <button class="btn sm" data-crm-action="quote">Đã báo giá</button>
       </div>
       <div class="crm-project-hint">
         <strong>Dự án sẽ tự tạo nếu chốt deal</strong>
@@ -575,6 +577,40 @@
     }
   }
 
+  async function deleteLead(){
+    const row=selectedRow();
+    if(!row)return;
+    if(!confirm(`Xóa lead "${row.title}"?`))return;
+    const removeLocal=()=>{
+      rows=rows.filter(item=>String(item.deal_id)!==String(row.deal_id));
+      selectedId=rows[0]?.deal_id||"";
+    };
+    if(sourceMode!=="supabase"){
+      removeLocal();
+      ZL.toast("Đã xóa lead demo");
+      render();
+      return;
+    }
+    try{
+      const client=ZL.supabase.getClient();
+      let deleteClient=false;
+      if(row.client_id){
+        const related=await client.from("crm_deals").select("id",{count:"exact",head:true}).eq("client_id",row.client_id);
+        if(related.error)throw related.error;
+        deleteClient=(related.count||0)<=1;
+      }
+      const result=deleteClient&&row.client_id?
+        await client.from("crm_clients").delete().eq("id",row.client_id):
+        await client.from("crm_deals").delete().eq("id",row.deal_id);
+      if(result.error)throw result.error;
+      removeLocal();
+      ZL.toast("Đã xóa lead");
+      await load(true);
+    }catch(e){
+      ZL.toast(e.message||"Không xóa được lead");
+    }
+  }
+
   async function persistQuickAction(row,type,title,content,dealPatch={}){
     const stamp=new Date().toLocaleString("vi-VN",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
     const line=`[${stamp}] ${content}`;
@@ -613,12 +649,6 @@
         if(!content)return;
         await persistQuickAction(row,"zalo","Đã ghi log Zalo",content);
         ZL.toast("Đã lưu log Zalo");
-      }else if(action==="quote"){
-        const content=window.prompt("Ghi chú báo giá:",`Đã gửi báo giá ${moneyVnd(row.value_amount)} cho ${row.title}.`);
-        if(!content)return;
-        await persistQuickAction(row,"note","Đã đánh dấu báo giá",content,{stage:"quoted",probability:55});
-        selectedId=row.deal_id;
-        ZL.toast("Đã chuyển sang Quoted");
       }else if(action==="task"){
         const title=window.prompt("Task cần làm tiếp theo:",`Follow-up ${row.title}`);
         if(!title)return;
@@ -728,6 +758,7 @@
       event.preventDefault();
       saveLeadDetail();
     });
+    document.getElementById("crmDeleteLead")?.addEventListener("click",deleteLead);
     document.querySelectorAll("[data-crm-action]").forEach(btn=>btn.addEventListener("click",()=>handleQuickAction(btn.dataset.crmAction)));
     document.getElementById("crmCloseModal")?.addEventListener("click",()=>{addStage="";render();});
     document.getElementById("crmSaveLead")?.addEventListener("click",createLead);

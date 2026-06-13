@@ -34,7 +34,7 @@
     {key:"side",label:"Side"},
     {key:"back",label:"Back"}
   ];
-  const EXERCISES=["Squat","Bench Press","Deadlift","Overhead Press","Barbell Row","Pull-up weighted"];
+  const DEFAULT_EXERCISES=["Squat","Bench Press","Deadlift","Overhead Press","Barbell Row","Pull-up weighted"];
   let measurements=[];
   let prs=[];
   let profile={height_cm:170};
@@ -47,6 +47,12 @@
   let selectedPr="Bench Press";
   let editingId="";
   let pendingPhotos={};
+  let exercises=[...DEFAULT_EXERCISES];
+  let hiddenExercises=new Set();
+  let connectionOpen=false;
+  let authEmail="";
+  let authPassword="";
+  let currentUserEmail="";
 
   function today(){return ZL.today();}
   function num(value){
@@ -123,6 +129,31 @@
     const r=Math.max(1,Number(reps)||1);
     return w?round(w*(1+r/30),1):null;
   }
+  function normalizeExerciseName(value){
+    return String(value||"").trim().replace(/\s+/g," ");
+  }
+  function normalizeExercises(list){
+    const merged=(Array.isArray(list)?list:DEFAULT_EXERCISES).map(normalizeExerciseName).filter(Boolean);
+    const unique=[...new Set(merged)];
+    return unique.filter(name=>!hiddenExercises.has(name));
+  }
+  function syncExerciseList(extra=[]){
+    exercises=normalizeExercises([...exercises,...extra]);
+    if(!exercises.length)exercises=[...DEFAULT_EXERCISES];
+    if(!exercises.includes(selectedPr))selectedPr=exercises[0];
+  }
+  function shortExerciseName(name){
+    return String(name||"").replace(" Press","").replace(" weighted","");
+  }
+  function nextExerciseName(){
+    let index=1;
+    let name="New Exercise";
+    while(exercises.includes(name)){
+      index+=1;
+      name=`New Exercise ${index}`;
+    }
+    return name;
+  }
   function normalizeMeasurement(row){
     const photos=row.photos&&typeof row.photos==="object"?row.photos:{};
     return {
@@ -182,17 +213,23 @@
   function loadLocal(){
     try{
       const raw=JSON.parse(localStorage.getItem(LOCAL_KEY)||"{}");
+      hiddenExercises=new Set(Array.isArray(raw.hiddenExercises)?raw.hiddenExercises:[]);
       profile={height_cm:170,...(raw.profile||{})};
       measurements=(Array.isArray(raw.measurements)&&raw.measurements.length?raw.measurements:sampleMeasurements()).map(normalizeMeasurement);
       prs=(Array.isArray(raw.prs)&&raw.prs.length?raw.prs:samplePrs()).map(normalizePr);
+      exercises=normalizeExercises([...(Array.isArray(raw.exercises)?raw.exercises:DEFAULT_EXERCISES),...prs.map(item=>item.exercise_name)]);
+      syncExerciseList();
     }catch(e){
+      hiddenExercises=new Set();
+      exercises=[...DEFAULT_EXERCISES];
       profile={height_cm:170};
       measurements=sampleMeasurements();
       prs=samplePrs();
+      syncExerciseList(prs.map(item=>item.exercise_name));
     }
   }
   function saveLocal(){
-    localStorage.setItem(LOCAL_KEY,JSON.stringify({profile,measurements,prs,updatedAt:ZL.nowIso()}));
+    localStorage.setItem(LOCAL_KEY,JSON.stringify({profile,measurements,prs,exercises,hiddenExercises:[...hiddenExercises],updatedAt:ZL.nowIso()}));
   }
   function sortedMeasurements(list=measurements){
     return [...list].sort((a,b)=>String(a.measured_on).localeCompare(String(b.measured_on))||String(a.created_at).localeCompare(String(b.created_at)));
@@ -315,6 +352,17 @@
       ${src?`<img src="${ZL.escape(src)}" alt="${ZL.escape(slot.label)}">`:`<span>${ZL.escape(slot.label)}</span>`}
     </div>`;
   }
+  function formPhotoBox(item,slot){
+    const hasPending=Object.prototype.hasOwnProperty.call(pendingPhotos,slot.key);
+    const src=hasPending?pendingPhotos[slot.key]:(item?.photos?.[slot.key]||"");
+    return `<div class="health-photo-drop ${src?"has-image":""}" data-health-photo-slot="${ZL.escape(slot.key)}" tabindex="0">
+      ${src?
+        `<img src="${ZL.escape(src)}" alt="${ZL.escape(slot.label)}">`:
+        `<div><strong>${ZL.escape(slot.label)}</strong><span>Click hoặc Ctrl+V ảnh</span></div>`}
+      <input type="file" accept="image/*" data-health-photo="${ZL.escape(slot.key)}" hidden>
+      ${src?`<button class="icon-btn danger" type="button" data-health-remove-photo="${ZL.escape(slot.key)}" title="Xóa ảnh">×</button>`:""}
+    </div>`;
+  }
   function renderPhotos(){
     const entry=latestWithPhotos();
     return `<section class="panel health-photo-panel">
@@ -356,22 +404,29 @@
     </svg>`;
   }
   function renderPrTracker(){
+    syncExerciseList(prs.map(item=>item.exercise_name));
     const list=[...prs].filter(item=>item.exercise_name===selectedPr).sort((a,b)=>b.performed_on.localeCompare(a.performed_on));
     const best=[...list].sort((a,b)=>(epley(b.weight_kg,b.reps)||0)-(epley(a.weight_kg,a.reps)||0))[0];
     return `<section class="panel health-pr-panel">
       <div class="panel-title">
         <div><h3>PR Tracker</h3><p>1RM ước tính theo Epley</p></div>
-        <select id="healthPrExercise">${EXERCISES.map(ex=>`<option ${selectedPr===ex?"selected":""}>${ZL.escape(ex)}</option>`).join("")}</select>
+        <select id="healthPrExercise">${exercises.map(ex=>`<option ${selectedPr===ex?"selected":""}>${ZL.escape(ex)}</option>`).join("")}</select>
       </div>
       ${renderPrChart()}
       <div class="health-best-pr">${best?`Best PR: ${fmt(epley(best.weight_kg,best.reps),"kg")} • ${fmt(best.weight_kg,"kg")} x ${best.reps}`:"Chưa có PR"}</div>
+      <div class="health-exercise-tools">
+        <input id="healthExerciseName" value="${ZL.escape(selectedPr)}" placeholder="Tên bài tập">
+        <button class="btn sm" id="healthRenameExercise" type="button">Đổi tên</button>
+        <button class="btn sm" id="healthAddExercise" type="button">+ Bài</button>
+        <button class="btn sm danger" id="healthRemoveExercise" type="button">Bỏ</button>
+      </div>
       <form id="healthPrForm" class="health-pr-form">
         <input id="healthPrDate" type="date" value="${today()}">
         <input id="healthPrWeight" type="number" step="0.5" placeholder="kg">
         <input id="healthPrReps" type="number" min="1" max="50" placeholder="reps">
         <button class="btn primary sm" type="submit">Lưu PR</button>
       </form>
-      <div class="segmented health-pr-tabs">${EXERCISES.map(ex=>`<button class="${selectedPr===ex?"active":""}" data-health-pr="${ZL.escape(ex)}">${ZL.escape(ex.replace(" Press",""))}</button>`).join("")}</div>
+      <div class="segmented health-pr-tabs">${exercises.map(ex=>`<button class="${selectedPr===ex?"active":""}" data-health-pr="${ZL.escape(ex)}">${ZL.escape(shortExerciseName(ex))}</button>`).join("")}</div>
     </section>`;
   }
   function placeholder(field){
@@ -385,6 +440,14 @@
   function formValue(field){
     const item=editingEntry();
     return item&&item[field]!==null&&item[field]!==undefined?String(item[field]):"";
+  }
+  function collectPhotos(current){
+    const photos={...(current?.photos||{})};
+    Object.entries(pendingPhotos).forEach(([key,value])=>{
+      if(value)photos[key]=value;
+      else delete photos[key];
+    });
+    return photos;
   }
   function renderForm(){
     const item=editingEntry();
@@ -401,7 +464,7 @@
           ${BODY_FIELDS.map(([key,label,min,max])=>`<div class="field compact"><label>${ZL.escape(label)}</label><input data-health-field="${key}" type="number" step="0.1" min="${min}" max="${max}" value="${ZL.escape(formValue(key))}" placeholder="${ZL.escape(placeholder(key))}"></div>`).join("")}
         </div>
         <div class="health-photo-inputs">
-          ${PHOTO_SLOTS.map(slot=>`<label><span>${slot.label}</span><input type="file" accept="image/*" data-health-photo="${slot.key}"></label>`).join("")}
+          ${PHOTO_SLOTS.map(slot=>formPhotoBox(item,slot)).join("")}
         </div>
         <div class="field"><label>Notes</label><textarea id="healthNotes" placeholder="Ghi chú buổi đo, trạng thái tập, ăn uống...">${ZL.escape(item?.notes||"")}</textarea></div>
         <div class="health-actions">
@@ -463,6 +526,34 @@
       </div>
     </div>`;
   }
+  function connectionModal(){
+    if(!connectionOpen)return "";
+    const config=ZL.supabase?.readConfig?.()||{};
+    return `<div class="task-modal">
+      <div class="task-modal-card crm-modal-card">
+        <div class="panel-title"><div><h2>Kết nối Supabase Health</h2><p>Dùng chung cấu hình Supabase của ZakLife. Không nhập service_role ở frontend.</p></div><button class="icon-btn" id="healthCloseConnection">×</button></div>
+        <div class="grid">
+          <div class="field"><label>Supabase URL</label><input id="healthSupabaseUrl" value="${ZL.escape(config.url||"")}" placeholder="https://xxx.supabase.co"></div>
+          <div class="field"><label>Anon / publishable key</label><input id="healthSupabaseAnon" value="${ZL.escape(config.anonKey||"")}" placeholder="sb_publishable_..."></div>
+        </div>
+        <div class="crm-modal-actions">
+          <button class="btn primary" id="healthSaveSupabaseConfig">Lưu cấu hình</button>
+          <button class="btn danger" id="healthClearSupabaseConfig">Xóa cấu hình</button>
+        </div>
+        <div class="crm-auth-box">
+          <div class="grid grid-2">
+            <div class="field"><label>Email</label><input id="healthAuthEmail" value="${ZL.escape(authEmail)}" placeholder="anh@example.com"></div>
+            <div class="field"><label>Mật khẩu</label><input id="healthAuthPassword" type="password" value="${ZL.escape(authPassword)}" placeholder="••••••••"></div>
+          </div>
+          <div class="crm-modal-actions">
+            <button class="btn primary" id="healthSignInSupabase">Đăng nhập</button>
+            <button class="btn" id="healthSignOutSupabase">Đăng xuất</button>
+          </div>
+          <p class="muted small">Cấu hình được lưu riêng theo domain/trình duyệt. Nếu anh đổi từ GitHub Pages sang zaklife.maichauhai.com thì cần nhập lại một lần.</p>
+        </div>
+      </div>
+    </div>`;
+  }
   function render(){
     const root=document.getElementById("healthRoot");
     if(!root)return;
@@ -471,7 +562,9 @@
         <div class="crm-search"><span>⌕</span><input value="" placeholder="Tìm số đo, ghi chú, bài tập..." disabled></div>
         <div class="crm-toolbar-actions">
           <span class="badge ${sourceMode==="supabase"?"success":"warning"}">${sourceMode==="supabase"?"Supabase":"Local demo"}</span>
+          ${currentUserEmail?`<span class="badge">${ZL.escape(currentUserEmail)}</span>`:""}
           <span class="badge blue">${measurements.length} check-in</span>
+          <button class="btn sm" id="healthOpenConnection">Cấu hình</button>
         </div>
       </div>
       ${errorText?`<div class="crm-warning">${ZL.escape(errorText)}</div>`:""}
@@ -490,6 +583,7 @@
           ${renderPrTracker()}
         </aside>
       </div>
+      ${connectionModal()}
     </div>`;
     bind();
   }
@@ -530,7 +624,7 @@
       measured_on:document.getElementById("healthDate").value,
       measurement_condition:document.getElementById("healthCondition").value,
       notes:document.getElementById("healthNotes").value.trim(),
-      photos:{...(current?.photos||{}),...pendingPhotos}
+      photos:collectPhotos(current)
     });
     rootFields().forEach(input=>{
       entry[input.dataset.healthField]=input.value===""?null:Number(input.value);
@@ -559,6 +653,7 @@
     try{
       const client=ZL.supabase.getClient();
       const user=await ZL.supabase.getUser();
+      currentUserEmail=user?.email||"";
       if(!user?.id)throw new Error("Chua dang nhap Supabase");
       await client.from("health_profiles").upsert({user_id:user.id,height_cm:profile.height_cm},{onConflict:"user_id"});
       const payload=tablePayload(entry);
@@ -625,6 +720,53 @@
       ZL.toast(e.message||"Không lưu được PR");
     }
   }
+  function exerciseInputName(){
+    return normalizeExerciseName(document.getElementById("healthExerciseName")?.value||"");
+  }
+  function addExercise(){
+    const name=exerciseInputName()||nextExerciseName();
+    hiddenExercises.delete(name);
+    if(!exercises.includes(name))exercises.push(name);
+    selectedPr=name;
+    saveLocal();
+    render();
+  }
+  async function renameExercise(){
+    const oldName=selectedPr;
+    const name=exerciseInputName();
+    if(!name||name===oldName)return;
+    if(exercises.includes(name)&&name!==oldName){
+      ZL.toast("Bài tập này đã có rồi");
+      return;
+    }
+    try{
+      if(sourceMode==="supabase"){
+        const result=await ZL.supabase.getClient().from("health_pr_records").update({exercise_name:name}).eq("exercise_name",oldName);
+        if(result.error)throw result.error;
+      }
+      prs=prs.map(item=>item.exercise_name===oldName?{...item,exercise_name:name,updated_at:ZL.nowIso()}:item);
+      exercises=exercises.map(item=>item===oldName?name:item);
+      hiddenExercises.delete(name);
+      selectedPr=name;
+      saveLocal();
+      ZL.toast("Đã đổi tên bài PR");
+      render();
+    }catch(e){
+      ZL.toast(e.message||"Không đổi tên được bài PR");
+    }
+  }
+  function removeExercise(){
+    if(exercises.length<=1){
+      ZL.toast("Cần giữ ít nhất 1 bài PR");
+      return;
+    }
+    hiddenExercises.add(selectedPr);
+    exercises=exercises.filter(item=>item!==selectedPr);
+    selectedPr=exercises[0]||DEFAULT_EXERCISES[0];
+    saveLocal();
+    ZL.toast("Đã bỏ bài khỏi danh sách");
+    render();
+  }
   function compressImage(file){
     return new Promise((resolve,reject)=>{
       const reader=new FileReader();
@@ -647,11 +789,27 @@
       reader.readAsDataURL(file);
     });
   }
+  function imageFileFromClipboard(event){
+    const items=[...(event.clipboardData?.items||[])];
+    const imageItem=items.find(item=>item.type&&item.type.startsWith("image/"));
+    return imageItem?.getAsFile?.()||null;
+  }
+  async function handlePhotoFile(slotKey,file){
+    if(!file)return;
+    try{
+      pendingPhotos[slotKey]=await compressImage(file);
+      ZL.toast("Đã nén ảnh, bấm Save Check-in để lưu");
+      render();
+    }catch(e){
+      ZL.toast("Không đọc được ảnh");
+    }
+  }
   async function handlePhoto(input){
     const file=input.files?.[0];
     if(!file)return;
     try{
       pendingPhotos[input.dataset.healthPhoto]=await compressImage(file);
+      render();
       ZL.toast("Đã nén ảnh, bấm Save Check-in để lưu");
     }catch(e){
       ZL.toast("Không đọc được ảnh");
@@ -673,12 +831,49 @@
       profile={height_cm:170,...(raw.profile||{})};
       measurements=(raw.measurements||[]).map(normalizeMeasurement);
       prs=(raw.prs||[]).map(normalizePr);
+      syncExerciseList(prs.map(item=>item.exercise_name));
       saveLocal();
       ZL.toast("Đã import Health JSON vào local");
       render();
     }catch(e){
       ZL.toast("File import không hợp lệ");
     }
+  }
+  function saveConnectionConfig(){
+    const url=document.getElementById("healthSupabaseUrl")?.value.trim();
+    const anonKey=document.getElementById("healthSupabaseAnon")?.value.trim();
+    ZL.supabase.saveConfig({url,anonKey});
+    loaded=false;
+    connectionOpen=false;
+    ZL.toast("Đã lưu cấu hình Supabase");
+    load(true);
+  }
+  async function signInConnection(){
+    authEmail=document.getElementById("healthAuthEmail")?.value.trim();
+    authPassword=document.getElementById("healthAuthPassword")?.value||"";
+    try{
+      const client=ZL.supabase.getClient();
+      const result=await client.auth.signInWithPassword({email:authEmail,password:authPassword});
+      if(result.error)throw result.error;
+      currentUserEmail=result.data?.user?.email||authEmail;
+      loaded=false;
+      connectionOpen=false;
+      ZL.toast("Đã đăng nhập Supabase");
+      await load(true);
+    }catch(e){
+      ZL.toast(e.message||"Không đăng nhập được Supabase");
+    }
+  }
+  async function signOutConnection(){
+    try{
+      await ZL.supabase.getClient().auth.signOut();
+    }catch(e){}
+    currentUserEmail="";
+    loaded=false;
+    sourceMode="demo";
+    connectionOpen=false;
+    ZL.toast("Đã đăng xuất Supabase");
+    load(true);
   }
   async function load(force=false){
     if(loading)return;
@@ -689,6 +884,7 @@
       loaded=true;
       loading=false;
       sourceMode="demo";
+      currentUserEmail="";
       errorText="Chưa cấu hình Supabase Health, đang dùng local/demo để test.";
       saveLocal();
       render();
@@ -698,6 +894,7 @@
       const client=ZL.supabase.getClient();
       const user=await ZL.supabase.getUser();
       if(!user)throw new Error("Health cần đăng nhập Supabase để đọc dữ liệu cá nhân.");
+      currentUserEmail=user.email||"Supabase user";
       const prof=await client.from("health_profiles").select("*").maybeSingle();
       if(prof.error)throw prof.error;
       profile={height_cm:170,...(prof.data||{})};
@@ -707,11 +904,13 @@
       if(pr.error)throw pr.error;
       measurements=(body.data||[]).map(normalizeMeasurement);
       prs=(pr.data||[]).map(normalizePr);
+      syncExerciseList(prs.map(item=>item.exercise_name));
       sourceMode="supabase";
       errorText="";
       loaded=true;
     }catch(e){
       sourceMode="demo";
+      currentUserEmail="";
       errorText=e.message||"Không đọc được Supabase Health, đang dùng local/demo.";
       loaded=true;
     }finally{
@@ -732,13 +931,55 @@
     document.getElementById("healthCancelEdit")?.addEventListener("click",()=>{editingId="";pendingPhotos={};render();});
     document.querySelectorAll("[data-health-edit]").forEach(btn=>btn.onclick=()=>{editingId=btn.dataset.healthEdit;pendingPhotos={};render();});
     document.querySelectorAll("[data-health-delete]").forEach(btn=>btn.onclick=()=>deleteEntry(btn.dataset.healthDelete));
+    document.querySelectorAll("[data-health-photo-slot]").forEach(box=>{
+      box.addEventListener("click",event=>{
+        if(event.target.closest("button"))return;
+        box.querySelector("input[type='file']")?.click();
+      });
+      box.addEventListener("keydown",event=>{
+        if(event.key==="Enter"||event.key===" "){
+          event.preventDefault();
+          box.querySelector("input[type='file']")?.click();
+        }
+      });
+      box.addEventListener("paste",event=>{
+        const file=imageFileFromClipboard(event);
+        if(!file)return;
+        event.preventDefault();
+        handlePhotoFile(box.dataset.healthPhotoSlot,file);
+      });
+    });
+    document.querySelectorAll("[data-health-remove-photo]").forEach(btn=>btn.onclick=event=>{
+      event.stopPropagation();
+      pendingPhotos[btn.dataset.healthRemovePhoto]="";
+      render();
+    });
     document.querySelectorAll("[data-health-photo]").forEach(input=>input.onchange=()=>handlePhoto(input));
     document.getElementById("healthReload")?.addEventListener("click",()=>load(true));
     document.getElementById("healthExport")?.addEventListener("click",exportJson);
     document.getElementById("healthImport")?.addEventListener("change",e=>importJson(e.target.files?.[0]));
+    const exerciseNameInput=document.getElementById("healthExerciseName");
+    if(exerciseNameInput&&exerciseNameInput.value!==selectedPr)exerciseNameInput.value=selectedPr;
     document.getElementById("healthPrExercise")?.addEventListener("change",e=>{selectedPr=e.target.value;render();});
+    document.getElementById("healthAddExercise")?.addEventListener("click",addExercise);
+    document.getElementById("healthRenameExercise")?.addEventListener("click",renameExercise);
+    document.getElementById("healthRemoveExercise")?.addEventListener("click",removeExercise);
     document.getElementById("healthPrForm")?.addEventListener("submit",savePr);
     document.querySelectorAll("[data-health-pr]").forEach(btn=>btn.onclick=()=>{selectedPr=btn.dataset.healthPr;render();});
+    document.getElementById("healthOpenConnection")?.addEventListener("click",()=>{connectionOpen=true;render();});
+    document.getElementById("healthCloseConnection")?.addEventListener("click",()=>{connectionOpen=false;render();});
+    document.getElementById("healthSaveSupabaseConfig")?.addEventListener("click",saveConnectionConfig);
+    document.getElementById("healthClearSupabaseConfig")?.addEventListener("click",()=>{
+      ZL.supabase.clearConfig();
+      sourceMode="demo";
+      currentUserEmail="";
+      loaded=false;
+      connectionOpen=false;
+      ZL.toast("Đã xóa cấu hình Supabase");
+      load(true);
+    });
+    document.getElementById("healthSignInSupabase")?.addEventListener("click",signInConnection);
+    document.getElementById("healthSignOutSupabase")?.addEventListener("click",signOutConnection);
   }
 
   ZL.modules.health={render:()=>{render();load();}};
