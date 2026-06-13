@@ -352,15 +352,16 @@
       ${src?`<img src="${ZL.escape(src)}" alt="${ZL.escape(slot.label)}">`:`<span>${ZL.escape(slot.label)}</span>`}
     </div>`;
   }
-  function formPhotoBox(item,slot){
-    const hasPending=Object.prototype.hasOwnProperty.call(pendingPhotos,slot.key);
+  function formPhotoBox(item,slot,targetId=""){
+    const directTarget=String(targetId||"");
+    const hasPending=!directTarget&&Object.prototype.hasOwnProperty.call(pendingPhotos,slot.key);
     const src=hasPending?pendingPhotos[slot.key]:(item?.photos?.[slot.key]||"");
-    return `<div class="health-photo-drop ${src?"has-image":""}" data-health-photo-slot="${ZL.escape(slot.key)}" tabindex="0">
+    return `<div class="health-photo-drop ${src?"has-image":""}" data-health-photo-slot="${ZL.escape(slot.key)}" data-health-photo-target="${ZL.escape(directTarget)}" tabindex="0">
       ${src?
         `<img src="${ZL.escape(src)}" alt="${ZL.escape(slot.label)}">`:
-        `<div><strong>${ZL.escape(slot.label)}</strong><span>Click hoặc Ctrl+V ảnh</span></div>`}
-      <input type="file" accept="image/*" data-health-photo="${ZL.escape(slot.key)}" hidden>
-      ${src?`<button class="icon-btn danger" type="button" data-health-remove-photo="${ZL.escape(slot.key)}" title="Xóa ảnh">×</button>`:""}
+        `<div><strong>${ZL.escape(slot.label)}</strong><span>${directTarget?"Click/Ctrl+V để lưu":"Click hoặc Ctrl+V ảnh"}</span></div>`}
+      <input type="file" accept="image/*" data-health-photo="${ZL.escape(slot.key)}" data-health-photo-target="${ZL.escape(directTarget)}" hidden>
+      ${src?`<button class="icon-btn danger" type="button" data-health-remove-photo="${ZL.escape(slot.key)}" data-health-remove-target="${ZL.escape(directTarget)}" title="Xóa ảnh">×</button>`:""}
     </div>`;
   }
   function renderPhotos(){
@@ -368,9 +369,9 @@
     return `<section class="panel health-photo-panel">
       <div class="panel-title"><div><h3>Progress Photos</h3><p>Front / Side / Back, nén tối đa 800px</p></div></div>
       <div class="health-photo-grid">
-        ${PHOTO_SLOTS.map(slot=>photoBox(entry,slot)).join("")}
+        ${entry?PHOTO_SLOTS.map(slot=>formPhotoBox(entry,slot,entry.id)).join(""):PHOTO_SLOTS.map(slot=>photoBox(entry,slot)).join("")}
       </div>
-      <div class="item-meta">${entry?`Mốc đang xem: ${ZL.escape(entry.measured_on)} (${ZL.escape(conditionLabel(entry.measurement_condition))})`:"Chưa có ảnh"}</div>
+      <div class="item-meta">${entry?`Mốc đang xem: ${ZL.escape(entry.measured_on)} (${ZL.escape(conditionLabel(entry.measurement_condition))}) · Bấm ô ảnh hoặc Ctrl+V để thêm.`:"Chưa có mốc đo để gắn ảnh"}</div>
     </section>`;
   }
   function renderInsights(){
@@ -794,26 +795,44 @@
     const imageItem=items.find(item=>item.type&&item.type.startsWith("image/"));
     return imageItem?.getAsFile?.()||null;
   }
-  async function handlePhotoFile(slotKey,file){
+  async function persistPhotoToEntry(targetId,slotKey,dataUrl){
+    const target=measurements.find(item=>String(item.id)===String(targetId));
+    if(!target){
+      pendingPhotos[slotKey]=dataUrl;
+      render();
+      return;
+    }
+    const photos={...(target.photos||{})};
+    if(dataUrl)photos[slotKey]=dataUrl;
+    else delete photos[slotKey];
+    const updated={...target,photos,is_seed:false,updated_at:ZL.nowIso()};
+    if(sourceMode==="supabase"&&!String(target.id).startsWith("seed-")){
+      const result=await ZL.supabase.getClient().from("health_measurements").update({photos}).eq("id",target.id);
+      if(result.error)throw result.error;
+    }
+    measurements=measurements.map(item=>String(item.id)===String(target.id)?updated:item);
+    if(sourceMode!=="supabase"||String(target.id).startsWith("seed-"))saveLocal();
+    if(String(editingId)===String(target.id))pendingPhotos={};
+    ZL.toast(dataUrl?"Đã lưu ảnh progress":"Đã xóa ảnh progress");
+    render();
+  }
+  async function handlePhotoFile(slotKey,file,targetId=""){
     if(!file)return;
     try{
-      pendingPhotos[slotKey]=await compressImage(file);
-      ZL.toast("Đã nén ảnh, bấm Save Check-in để lưu");
-      render();
+      const dataUrl=await compressImage(file);
+      if(targetId)await persistPhotoToEntry(targetId,slotKey,dataUrl);
+      else{
+        pendingPhotos[slotKey]=dataUrl;
+        ZL.toast("Đã nén ảnh, bấm Save Check-in để lưu");
+        render();
+      }
     }catch(e){
       ZL.toast("Không đọc được ảnh");
     }
   }
   async function handlePhoto(input){
     const file=input.files?.[0];
-    if(!file)return;
-    try{
-      pendingPhotos[input.dataset.healthPhoto]=await compressImage(file);
-      render();
-      ZL.toast("Đã nén ảnh, bấm Save Check-in để lưu");
-    }catch(e){
-      ZL.toast("Không đọc được ảnh");
-    }
+    await handlePhotoFile(input.dataset.healthPhoto,file,input.dataset.healthPhotoTarget||"");
   }
   function exportJson(){
     const blob=new Blob([JSON.stringify({profile,measurements,prs,exportedAt:ZL.nowIso()},null,2)],{type:"application/json"});
@@ -946,13 +965,22 @@
         const file=imageFileFromClipboard(event);
         if(!file)return;
         event.preventDefault();
-        handlePhotoFile(box.dataset.healthPhotoSlot,file);
+        handlePhotoFile(box.dataset.healthPhotoSlot,file,box.dataset.healthPhotoTarget||"");
       });
     });
-    document.querySelectorAll("[data-health-remove-photo]").forEach(btn=>btn.onclick=event=>{
+    document.querySelectorAll("[data-health-remove-photo]").forEach(btn=>btn.onclick=async event=>{
       event.stopPropagation();
-      pendingPhotos[btn.dataset.healthRemovePhoto]="";
-      render();
+      const targetId=btn.dataset.healthRemoveTarget||"";
+      if(targetId){
+        try{
+          await persistPhotoToEntry(targetId,btn.dataset.healthRemovePhoto,"");
+        }catch(e){
+          ZL.toast(e.message||"Không xóa được ảnh");
+        }
+      }else{
+        pendingPhotos[btn.dataset.healthRemovePhoto]="";
+        render();
+      }
     });
     document.querySelectorAll("[data-health-photo]").forEach(input=>input.onchange=()=>handlePhoto(input));
     document.getElementById("healthReload")?.addEventListener("click",()=>load(true));
