@@ -848,6 +848,7 @@ textarea.tall{min-height:272px}
 }
 .crm-detail-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;border-bottom:1px solid rgba(255,255,255,.07);padding-bottom:12px;margin-bottom:12px}
 .crm-detail-head h2{margin:0 0 8px;font-size:1rem;line-height:1.28;overflow-wrap:anywhere}
+.crm-detail-head p{margin:-3px 0 8px;color:var(--text-secondary);font-size:.8rem;line-height:1.35;overflow-wrap:anywhere}
 .crm-edit-form{
   border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(5,7,12,.18);
   padding:12px;display:grid;gap:2px

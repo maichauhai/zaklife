@@ -252,10 +252,28 @@
     return d.toLocaleString("vi-VN",{weekday:"short",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
   }
 
+  function serviceLabel(value){
+    return SERVICES.find(service=>service.key===value)?.label||value||"Other";
+  }
+
+  function customerLabel(row){
+    const name=String(row.full_name||"").trim();
+    const company=String(row.company_name||"").trim();
+    if(name&&company&&name.toLowerCase()!==company.toLowerCase())return `${name} - ${company}`;
+    return name||company||row.title||"Khach chua ten";
+  }
+
+  function dealLabel(row){
+    const title=String(row.title||"").trim();
+    const customer=customerLabel(row).trim().toLowerCase();
+    if(title&&title.toLowerCase()!==customer)return title;
+    return serviceLabel(row.service_type||"other");
+  }
+
   function dealCard(row){
     return `<button class="crm-deal-card ${String(selectedId)===String(row.deal_id)?"active":""}" data-crm-select="${ZL.escape(row.deal_id)}" data-crm-deal-id="${ZL.escape(row.deal_id)}" draggable="true">
-      <div class="crm-deal-head"><strong>${ZL.escape(row.title)}</strong>${sourceChip(row)}</div>
-      <p>${ZL.escape(row.service_type||"other")}</p>
+      <div class="crm-deal-head"><strong>${ZL.escape(customerLabel(row))}</strong>${sourceChip(row)}</div>
+      <p class="crm-deal-title">${ZL.escape(dealLabel(row))}</p>
       <div class="crm-deal-tags">${tagList(row.tags)}</div>
       <div class="crm-deal-foot"><span>${moneyShort(row.value_amount)}</span><em>${dueText(row.follow_up_at)}</em></div>
     </button>`;
@@ -279,7 +297,7 @@
     if(!row)return `<aside class="crm-detail"><div class="empty">Chưa có lead</div></aside>`;
     return `<aside class="crm-detail">
       <div class="crm-detail-head">
-        <div><h2>${ZL.escape(row.title)}</h2>${sourceChip(row)}</div>
+        <div><h2>${ZL.escape(customerLabel(row))}</h2><p>${ZL.escape(dealLabel(row))}</p>${sourceChip(row)}</div>
         <button class="icon-btn" data-crm-close-detail>×</button>
       </div>
       <form class="crm-edit-form" id="crmLeadForm">
