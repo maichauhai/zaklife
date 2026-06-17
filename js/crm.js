@@ -260,12 +260,18 @@
     const name=String(row.full_name||"").trim();
     const company=String(row.company_name||"").trim();
     if(name&&company&&name.toLowerCase()!==company.toLowerCase())return `${name} - ${company}`;
-    return name||company||row.title||"Khach chua ten";
+    if(name||company)return name||company;
+    const title=String(row.title||"").trim();
+    const parts=title.split(/\s+-\s+/).map(part=>part.trim()).filter(Boolean);
+    if(parts.length>1)return parts[0];
+    return title||"Khach chua ten";
   }
 
   function dealLabel(row){
     const title=String(row.title||"").trim();
     const customer=customerLabel(row).trim().toLowerCase();
+    const parts=title.split(/\s+-\s+/).map(part=>part.trim()).filter(Boolean);
+    if(parts.length>1&&parts[0].toLowerCase()===customer)return parts.slice(1).join(" - ");
     if(title&&title.toLowerCase()!==customer)return title;
     return serviceLabel(row.service_type||"other");
   }
