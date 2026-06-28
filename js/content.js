@@ -1,4 +1,4 @@
-(function(){
+﻿(function(){
   const ZL=window.ZL;
   let weekStart=getMonday(new Date());
   let selectedId="";
@@ -40,6 +40,8 @@
       thumbStoragePath:"",
       mediaStatus:"empty",
       deleteOriginalAfterPost:true,
+      shareToStory:false,
+      storyStatus:"ready",
       reelEnabled:false,
       musicUrl:"",
       reelCaption:"",
@@ -217,6 +219,12 @@
       </div>
       <div class="panel soft-panel content-reel-box">
         <label class="inline-check">
+          <input type="checkbox" id="contentShareToStory" ${post.shareToStory||post.share_to_story?"checked":""}>
+          <span>Chia sẻ bài này lên Tin sau khi đăng</span>
+        </label>
+        <p class="content-media-meta">n8n sẽ thử tạo Facebook Story bằng ảnh của bài sau khi bài feed đăng thành công. Bài không có ảnh sẽ bỏ qua Story.</p>
+      </div>      <div class="panel soft-panel content-reel-box">
+        <label class="inline-check">
           <input type="checkbox" id="contentReelEnabled" ${post.reelEnabled||post.musicUrl||post.music_url?"checked":""}>
           <span>Tạo Reel từ ảnh bài này</span>
         </label>
@@ -309,6 +317,7 @@
     const driveFileId=document.getElementById("contentDriveFileId").value.trim();
     const mediaStatus=document.getElementById("contentMediaStatus").value.trim()||(photoUrl?"external_url":"empty");
     const deleteOriginalAfterPost=document.getElementById("contentDeleteOriginal")?.checked!==false;
+    const shareToStory=!!document.getElementById("contentShareToStory")?.checked;
     const musicUrl=document.getElementById("contentMusicUrl")?.value.trim()||"";
     const reelCaption=document.getElementById("contentReelCaption")?.value.trim()||"";
     const reelOverlayText=document.getElementById("contentReelOverlay")?.value.trim()||"";
@@ -320,6 +329,7 @@
       photo_path:photoUrl,image_url:photoUrl,
       storagePath,thumbUrl,thumbStoragePath,
       mediaStatus,mediaMime,mediaSize,mediaProvider,driveFileId,deleteOriginalAfterPost,
+      shareToStory,share_to_story:shareToStory,
       reelEnabled,musicUrl,music_url:musicUrl,
       reelCaption,reel_caption:reelCaption,
       reelOverlayText,reel_overlay_text:reelOverlayText,

@@ -337,6 +337,13 @@ def should_import(args, row):
     return status in args.import_statuses
 
 
+def is_past_schedule(row):
+    try:
+        return parse_date(get_field(row, "scheduled_date")) < now_dt().date().isoformat()
+    except ValueError:
+        return False
+
+
 def cleanup_candidates(existing, days):
     threshold = now_dt() - timedelta(days=days)
     out = []
@@ -374,6 +381,7 @@ def process(args):
         "dry_run": args.dry_run,
         "target_status": args.target_status,
         "skipped_status": 0,
+        "skipped_past": 0,
         "skipped_existing": 0,
         "deleted_old_posted": 0,
         "errors": [],
@@ -384,6 +392,9 @@ def process(args):
     for row in rows:
         if not should_import(args, row):
             result["skipped_status"] += 1
+            continue
+        if is_past_schedule(row):
+            result["skipped_past"] += 1
             continue
         try:
             post = build_post(args, row)
@@ -414,6 +425,7 @@ def process(args):
         "rows": result["rows"],
         "imported": result["imported"],
         "skipped_status": result["skipped_status"],
+        "skipped_past": result["skipped_past"],
         "skipped_existing": result["skipped_existing"],
         "deleted_old_posted": result["deleted_old_posted"],
         "last_error": result["errors"][0]["error"] if result["errors"] else None,

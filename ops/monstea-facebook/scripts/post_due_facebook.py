@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 import argparse
 import json
 import mimetypes
@@ -202,6 +202,16 @@ def is_public_url(value):
     return value.lower().startswith(("http://", "https://"))
 
 
+def truthy(value):
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in ("1", "true", "yes", "y", "on")
+
+
+def should_share_to_story(post):
+    return truthy(post.get("shareToStory") or post.get("share_to_story") or post.get("storyEnabled") or post.get("story_enabled"))
+
+
 def is_local_media_path(value):
     return bool(re.match(r"^[a-zA-Z]:[\\/].+\.(png|jpe?g|webp|gif)$", value.strip(), re.IGNORECASE))
 
@@ -250,6 +260,30 @@ def post_multipart(url, fields, file_field, file_path):
         return json.loads(res.read().decode("utf-8"))
 
 
+def publish_photo_story(creds, file_path):
+    page_id = creds["page_id"]
+    token = creds["page_access_token"]
+    base = api_base(creds)
+    upload = post_multipart(
+        f"{base}/{page_id}/photos",
+        {"access_token": token, "published": "false"},
+        "source",
+        file_path,
+    )
+    photo_id = upload.get("id") or upload.get("post_id")
+    if not photo_id:
+        raise RuntimeError(f"Facebook did not return a photo id for story upload: {upload}")
+    story = post_form(
+        f"{base}/{page_id}/photo_stories",
+        {"access_token": token, "photo_id": photo_id},
+    )
+    return {
+        "story_photo_id": photo_id,
+        "facebook_story_id": story.get("id") or story.get("post_id"),
+        "story_response": story,
+    }
+
+
 def publish_to_facebook(creds, post):
     page_id = creds["page_id"]
     token = creds["page_access_token"]
@@ -278,19 +312,32 @@ def publish_to_facebook(creds, post):
                 path = ROOT / resolved
             if not path.exists():
                 raise FileNotFoundError(f"Photo not found: {path}")
-            return post_multipart(
+            result = post_multipart(
                 f"{base}/{page_id}/photos",
                 {"access_token": token, "caption": caption, "published": "true"},
                 "source",
                 path,
             )
+            if should_share_to_story(post):
+                try:
+                    story = publish_photo_story(creds, path)
+                    result.update(story)
+                    result["story_status"] = "posted"
+                except Exception as exc:
+                    result["story_status"] = "failed"
+                    result["story_last_error"] = str(exc)
+            return result
 
         fields = {"access_token": token}
         if message:
             fields["message"] = message
         if public_link:
             fields["link"] = public_link
-        return post_form(f"{base}/{page_id}/feed", fields)
+        result = post_form(f"{base}/{page_id}/feed", fields)
+        if should_share_to_story(post):
+            result["story_status"] = "skipped"
+            result["story_last_error"] = "Story sharing needs a photo post."
+        return result
     finally:
         if temp_path and os.path.exists(temp_path):
             try:
@@ -417,10 +464,28 @@ def process(source="firebase", dry_run=False, post_id=None):
                     "facebook_post_id": result.get("post_id") or result.get("id"),
                     "last_error": None,
                 }
+                if should_share_to_story(post):
+                    story_status = result.get("story_status") or "skipped"
+                    patch.update({
+                        "storyStatus": story_status,
+                        "story_status": story_status,
+                        "facebook_story_id": result.get("facebook_story_id"),
+                        "story_photo_id": result.get("story_photo_id"),
+                        "story_posted_at": now_iso() if story_status == "posted" else None,
+                        "story_last_error": result.get("story_last_error"),
+                    })
                 patch["status"] = "posted"
                 update_post(actual_source, pid, patch, items)
                 posted += 1
-                log_event({"level": "info", "event": "posted", "post_id": pid, "facebook_post_id": patch.get("facebook_post_id"), "source": actual_source})
+                log_event({
+                    "level": "info",
+                    "event": "posted",
+                    "post_id": pid,
+                    "facebook_post_id": patch.get("facebook_post_id"),
+                    "story_status": patch.get("story_status"),
+                    "facebook_story_id": patch.get("facebook_story_id"),
+                    "source": actual_source,
+                })
             except Exception as exc:
                 failed += 1
                 update_post(actual_source, pid, {"last_error": str(exc), "status": "failed"}, items)

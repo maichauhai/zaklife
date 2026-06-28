@@ -15,7 +15,7 @@ if ($File) {
     if (!(Test-Path -LiteralPath $File)) {
         throw "JSON file not found: $File"
     }
-    $Body = Get-Content -Raw -LiteralPath $File
+    $Body = Get-Content -Raw -Encoding UTF8 -LiteralPath $File
 } elseif ($Json) {
     $Body = $Json
 } else {

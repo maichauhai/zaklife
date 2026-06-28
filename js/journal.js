@@ -133,29 +133,31 @@
 
   function collectJournalEntry(){
     const value=id=>document.getElementById(id)?.value||"";
+    const current=entryFor(selectedDate);
     const active=document.querySelector(".mood-btn.active");
     const mood=MOODS[Number(active?.dataset.mood||2)]||MOODS[2];
     const gratitude=[1,2,3].map(i=>value("gratitude"+i).trim()).filter(Boolean);
+    const energyInput=document.getElementById("energyMorning");
+    const brainDumpInput=document.getElementById("brainDump");
     return {
-      ...entryFor(selectedDate),
+      ...current,
       mood:mood.score,
       moodEmoji:mood.emoji,
       moodLabel:mood.label,
-      energy:{
+      energy:energyInput?{
         morning:Number(value("energyMorning"))||5,
         afternoon:Number(value("energyAfternoon"))||5,
         evening:Number(value("energyEvening"))||5
-      },
+      }:(current.energy||{morning:5,afternoon:5,evening:5}),
       sleepQuality:Number(value("sleepQuality"))||3,
       sleepHours:Number(value("sleepHours"))||0,
       text:value("journalText").trim(),
-      brainDump:value("brainDump").trim(),
+      brainDump:brainDumpInput?brainDumpInput.value.trim():String(current.brainDump||""),
       gratitude,
       win:value("winOfDay").trim(),
       timestamp:ZL.nowIso()
     };
   }
-
   function persistJournal(options={}){
     if(!document.getElementById("journalText"))return Promise.resolve();
     ZL.state.zak.entries=ZL.state.zak.entries||{};
@@ -187,21 +189,24 @@
     const active=document.querySelector(".mood-btn.active");
     const mood=MOODS[Number(active?.dataset.mood||2)];
     const gratitude=[1,2,3].map(i=>document.getElementById("gratitude"+i).value.trim()).filter(Boolean);
+    const current=entryFor(selectedDate);
+    const energyMorning=document.getElementById("energyMorning");
+    const brainDump=document.getElementById("brainDump");
     ZL.state.zak.entries=ZL.state.zak.entries||{};
     ZL.state.zak.entries[selectedDate]={
-      ...entryFor(selectedDate),
+      ...current,
       mood:mood.score,
       moodEmoji:mood.emoji,
       moodLabel:mood.label,
-      energy:{
+      energy:energyMorning?{
         morning:Number(document.getElementById("energyMorning").value)||5,
         afternoon:Number(document.getElementById("energyAfternoon").value)||5,
         evening:Number(document.getElementById("energyEvening").value)||5
-      },
+      }:(current.energy||{morning:5,afternoon:5,evening:5}),
       sleepQuality:Number(document.getElementById("sleepQuality").value)||3,
       sleepHours:Number(document.getElementById("sleepHours").value)||0,
       text:document.getElementById("journalText").value.trim(),
-      brainDump:document.getElementById("brainDump").value.trim(),
+      brainDump:brainDump?brainDump.value.trim():String(current.brainDump||""),
       gratitude,
       win:document.getElementById("winOfDay").value.trim(),
       timestamp:ZL.nowIso()
@@ -210,7 +215,6 @@
     ZL.toast("Đã lưu journal");
     render();
   }
-
   function toggleHabit(id,date=selectedDate){
     ZL.state.zak.habitLog=ZL.state.zak.habitLog||{};
     ZL.state.zak.habitLog[date]=ZL.state.zak.habitLog[date]||{};
@@ -477,7 +481,6 @@
       </div>
       <div class="wellbeing-grid">
         ${renderMood(entry,moodIndex)}
-        ${renderEnergy(entry)}
         ${renderSleep(entry)}
       </div>
       <div class="journal-write-grid" style="margin-top:16px">
@@ -490,12 +493,10 @@
           </div>
           <div class="field compact"><label>Biết ơn 3</label><input id="gratitude3" value="${ZL.escape(gratitude[2]||"")}"></div>
           <div class="field"><label>Win of the Day</label><textarea id="winOfDay" class="win-textarea" placeholder="Hôm nay anh đã hoàn thành điều gì?">${ZL.escape(entry.win||"")}</textarea></div>
-          <button class="btn" id="suggestWinBtn">Gợi ý từ dữ liệu hôm nay</button>
-        </div>
-        <div class="panel">
-          <div class="panel-title"><div><h2>Brain Dump</h2><p>Xả suy nghĩ để sau này phân tích</p></div></div>
-          <div class="field"><textarea id="brainDump" class="tall" placeholder="Ghi thô, không cần cấu trúc">${ZL.escape(entry.brainDump||"")}</textarea></div>
-          <button class="btn primary" id="saveJournalBtn">Lưu ngày đang chọn</button>
+          <div class="journal-actions">
+            <button class="btn" id="suggestWinBtn">Gợi ý từ dữ liệu hôm nay</button>
+            <button class="btn primary" id="saveJournalBtn">Lưu ngày đang chọn</button>
+          </div>
         </div>
       </div>
       <div class="layout-2 habit-layout" style="margin-top:16px">

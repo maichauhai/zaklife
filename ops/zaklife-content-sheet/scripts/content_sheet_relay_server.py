@@ -42,6 +42,7 @@ class RelayHandler(BaseHTTPRequestHandler):
             body = json.loads(raw_body) if raw_body.strip() else {}
         except json.JSONDecodeError:
             body = {}
+        body_options = body if isinstance(body, dict) else {}
         query = parse_qs(parsed.query)
 
         if parsed.path not in {"/sync", "/append"}:
@@ -50,15 +51,15 @@ class RelayHandler(BaseHTTPRequestHandler):
 
         try:
             if parsed.path == "/append":
-                dry_run = bool(body.get("dry_run") or query.get("dry_run"))
+                dry_run = bool(body_options.get("dry_run") or query.get("dry_run"))
                 result = google_sheet_writer.append_posts(body, dry_run=dry_run)
                 json_response(self, 200, {"ok": True, **result})
                 return
 
             argv = []
-            if body.get("dry_run") or query.get("dry_run"):
+            if body_options.get("dry_run") or query.get("dry_run"):
                 argv.append("--dry-run")
-            target_status = body.get("target_status") or (query.get("target_status") or [""])[0]
+            target_status = body_options.get("target_status") or (query.get("target_status") or [""])[0]
             if target_status:
                 argv.extend(["--target-status", target_status])
 

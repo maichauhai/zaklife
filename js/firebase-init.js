@@ -48,8 +48,10 @@
   };
   ZL.dateKey=function(date){
     const d=date instanceof Date?new Date(date):new Date(date||Date.now());
-    d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
-    return d.toISOString().slice(0,10);
+    const year=d.getFullYear();
+    const month=String(d.getMonth()+1).padStart(2,"0");
+    const day=String(d.getDate()).padStart(2,"0");
+    return `${year}-${month}-${day}`;
   };
   ZL.today=function(){return ZL.dateKey(new Date());};
   ZL.addDays=function(dateKey,days){
@@ -330,6 +332,8 @@
       driveFileId,
       mediaStatus:p.mediaStatus||(hasStoredOriginal?"ready":(photoUrl?"external_url":"empty")),
       deleteOriginalAfterPost:p.deleteOriginalAfterPost!==false,
+      shareToStory:!!(p.shareToStory||p.share_to_story),
+      storyStatus:p.storyStatus||p.story_status||"ready",
       reelEnabled:!!(p.reelEnabled||p.musicUrl||p.music_url),
       musicUrl:p.musicUrl||p.music_url||p.audio_url||"",
       reelCaption:p.reelCaption||p.reel_caption||"",

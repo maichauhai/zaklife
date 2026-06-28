@@ -3,6 +3,7 @@
   const TAGS=["Monstea","Tech","Game","Cá nhân","Marketing","Content","Kinh doanh","Đầu tư"];
   let ideaImages=[];
   let selectedTags=new Set();
+  let activeIdeaId="";
 
   function ideas(){
     ZL.state.zak.ideas=Array.isArray(ZL.state.zak.ideas)?ZL.state.zak.ideas:[];
@@ -11,6 +12,10 @@
 
   function activeIdeas(){
     return ideas().filter(idea=>idea&&!idea._deleted);
+  }
+
+  function ideaById(id){
+    return activeIdeas().find(idea=>String(idea.id)===String(id))||null;
   }
 
   function renderImagePreview(){
@@ -66,6 +71,7 @@
     ZL.state.zak.nextIdeaId=next+1;
     ideaImages=[];
     selectedTags.clear();
+    activeIdeaId=String(next);
     ZL.syncZakData();
     ZL.toast("Đã lưu ý tưởng");
     render();
@@ -73,6 +79,7 @@
 
   function deleteIdea(id){
     if(!confirm("Xóa ý tưởng này?"))return;
+    if(String(activeIdeaId)===String(id))activeIdeaId="";
     const now=Date.now();
     ZL.state.zak.ideas=ideas().map(idea=>String(idea.id)===String(id)
       ? {...idea,_deleted:true,deletedAt:ZL.nowIso(),_lastModified:now,images:[]}
@@ -114,9 +121,8 @@
     if(!list.length)return `<div class="empty">Chưa có ý tưởng</div>`;
     return list.map(idea=>{
       const tags=(idea.tags||[]).map(t=>`<span class="tag selected">${ZL.escape(t)}</span>`).join("");
-      const links=(idea.links||[]).map(l=>`<a class="idea-link" href="${ZL.escape(l)}" target="_blank">${ZL.escape(l)}</a>`).join("");
-      const imgs=(idea.images||[]).map(src=>`<img src="${src}" alt="" class="idea-img" data-open-image title="Bấm để phóng to">`).join("");
-      return `<article class="idea-card">
+      const previewLinks=(idea.links||[]).slice(0,2).map(l=>`<span class="idea-link-preview">${ZL.escape(l)}</span>`).join("");
+      return `<article class="idea-card" data-open-idea="${ZL.escape(idea.id)}" tabindex="0">
         <div class="idea-head">
           <div>
             <h3>${ZL.escape(idea.title||"Không tiêu đề")}</h3>
@@ -124,29 +130,81 @@
           </div>
           <button class="icon-btn danger" data-delete-idea="${ZL.escape(idea.id)}">×</button>
         </div>
-        ${idea.note?`<div class="idea-note">${ZL.escape(idea.note)}</div>`:""}
-        ${links?`<div class="idea-links">${links}</div>`:""}
-        ${imgs?`<div class="idea-images">${imgs}</div>`:""}
-        ${tags?`<div class="tag-row">${tags}</div>`:""}
+        ${idea.note?`<div class="idea-note idea-note-preview">${ZL.escape(idea.note)}</div>`:""}
+        ${previewLinks?`<div class="idea-links-preview">${previewLinks}</div>`:""}
+        <div class="idea-card-footer">
+          <div class="tag-row">${tags}</div>
+          <div class="idea-mini-meta">
+            ${idea.links?.length?`<span class="idea-mini-badge">${idea.links.length} link</span>`:""}
+            ${idea.images?.length?`<span class="idea-mini-badge">${idea.images.length} ảnh</span>`:""}
+          </div>
+        </div>
       </article>`;
     }).join("");
   }
 
+  function renderIdeaModal(){
+    if(!activeIdeaId)return "";
+    const idea=ideaById(activeIdeaId);
+    if(!idea)return "";
+    const tags=(idea.tags||[]).map(t=>`<span class="tag selected">${ZL.escape(t)}</span>`).join("");
+    const links=(idea.links||[]).map(l=>`<a class="idea-link" href="${ZL.escape(l)}" target="_blank" rel="noopener">${ZL.escape(l)}</a>`).join("");
+    const imgs=(idea.images||[]).map(src=>`<img src="${src}" alt="" class="idea-img" data-open-image title="Bấm để phóng to">`).join("");
+    return `<div class="idea-modal" id="ideaModal">
+      <div class="idea-modal-card">
+        <div class="panel-title">
+          <div>
+            <h2>${ZL.escape(idea.title||"Không tiêu đề")}</h2>
+            <p>${ZL.escape(new Date(idea.created||Date.now()).toLocaleString("vi-VN",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}))}</p>
+          </div>
+          <button class="icon-btn" id="ideaCloseModal">×</button>
+        </div>
+        ${idea.note?`<div class="idea-note idea-modal-note">${ZL.escape(idea.note)}</div>`:""}
+        ${links?`<div class="idea-modal-links">${links}</div>`:""}
+        ${imgs?`<div class="idea-images">${imgs}</div>`:""}
+        ${tags?`<div class="tag-row">${tags}</div>`:""}
+      </div>
+    </div>`;
+  }
+
   function bind(root){
-    root.querySelectorAll("[data-open-image]").forEach(img=>img.onclick=()=>openImage(img.src));
+    root.querySelectorAll("[data-open-image]").forEach(img=>img.onclick=e=>{
+      e.stopPropagation();
+      openImage(img.src);
+    });
     root.querySelectorAll("[data-tag]").forEach(btn=>btn.onclick=()=>{
       const tag=btn.dataset.tag;
       selectedTags.has(tag)?selectedTags.delete(tag):selectedTags.add(tag);
       render();
     });
+    root.querySelectorAll("[data-open-idea]").forEach(card=>{
+      card.onclick=e=>{
+        if(e.target.closest("button"))return;
+        activeIdeaId=card.dataset.openIdea;
+        render();
+      };
+      card.onkeydown=e=>{
+        if(e.key!=="Enter"&&e.key!==" ")return;
+        e.preventDefault();
+        activeIdeaId=card.dataset.openIdea;
+        render();
+      };
+    });
     root.querySelectorAll("[data-remove-image]").forEach(btn=>btn.onclick=()=>{
       ideaImages.splice(Number(btn.dataset.removeImage),1);
       render();
     });
-    root.querySelectorAll("[data-delete-idea]").forEach(btn=>btn.onclick=()=>deleteIdea(btn.dataset.deleteIdea));
+    root.querySelectorAll("[data-delete-idea]").forEach(btn=>btn.onclick=e=>{
+      e.stopPropagation();
+      deleteIdea(btn.dataset.deleteIdea);
+    });
     document.getElementById("ideaSaveBtn").onclick=saveIdea;
     document.getElementById("ideaExportBtn").onclick=exportIdeas;
     document.getElementById("ideaFileInput").onchange=e=>addFiles(e.target.files);
+    const close=root.querySelector("#ideaCloseModal");
+    if(close)close.onclick=()=>{activeIdeaId="";render();};
+    const modal=root.querySelector("#ideaModal");
+    if(modal)modal.onclick=e=>{if(e.target===modal){activeIdeaId="";render();}};
     const zone=document.getElementById("ideaPasteZone");
     zone.onpaste=e=>{
       const items=e.clipboardData?.items||[];
@@ -195,7 +253,8 @@
           ${renderImagePreview()}
         </div>
         <div class="ideas-list">${renderList()}</div>
-      </div>`;
+      </div>
+      ${renderIdeaModal()}`;
     bind(root);
   }
 
